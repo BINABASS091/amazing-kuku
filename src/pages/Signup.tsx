@@ -42,14 +42,28 @@ export function Signup() {
     e.preventDefault();
     setError('');
 
-        // Validation
-    if (!formData.fullName.trim()) {
-      setError('Please enter your full name');
+    // Trim and validate all inputs
+    const trimmedEmail = formData.email.trim().toLowerCase();
+    const trimmedFullName = formData.fullName.trim();
+    const trimmedBusinessName = formData.businessName.trim();
+    const trimmedLocation = formData.location.trim();
+    const trimmedPhoneNumber = formData.phoneNumber.trim();
+
+    // Validation
+    if (!trimmedFullName) {
+      setError('Full name is required');
       return;
     }
 
-    if (!formData.email.trim()) {
-      setError('Please enter your email');
+    if (!trimmedEmail) {
+      setError('Email is required');
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError('Please enter a valid email address');
       return;
     }
 
@@ -59,36 +73,41 @@ export function Signup() {
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError('Password must be at least 6 characters');
       return;
     }
 
-    if (!formData.businessName.trim()) {
-      setError('Please enter your business name');
+    if (!trimmedBusinessName) {
+      setError('Business name is required');
       return;
     }
 
-    if (!formData.location.trim()) {
-      setError('Please enter your location');
+    if (!trimmedLocation) {
+      setError('Location is required');
       return;
     }
 
-    if (!formData.phoneNumber.trim()) {
-      setError('Please enter your phone number');
+    if (!trimmedPhoneNumber) {
+      setError('Phone number is required');
+      return;
+    }
+
+    // Phone number validation (basic)
+    const phoneRegex = /^[\+]?[\d\s\-\(\)]{10,}$/;
+    if (!phoneRegex.test(trimmedPhoneNumber)) {
+      setError('Please enter a valid phone number');
       return;
     }
 
     setLoading(true);
 
     try {
-      await signUp(formData.email, formData.password, formData.fullName, 'FARMER', {
-        businessName: formData.businessName.trim(),
-        location: formData.location.trim(),
-        phoneNumber: formData.phoneNumber.trim(),
+      await signUp(trimmedEmail, formData.password, trimmedFullName, 'FARMER', {
+        businessName: trimmedBusinessName,
+        location: trimmedLocation,
+        phoneNumber: trimmedPhoneNumber,
         experienceYears: formData.experienceYears ? parseInt(formData.experienceYears) : 0,
-      });
-      
-      // Show success message
+      });      // Show success message
       alert('Account created successfully! Please log in to continue.');
       navigate('/login');
     } catch (err: any) {
