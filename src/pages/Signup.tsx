@@ -3,68 +3,89 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertCircle } from 'lucide-react';
 
+interface SignupFormData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  fullName: string;
+  businessName: string;
+  location: string;
+  phoneNumber: string;
+  experienceYears: string;
+}
+
 export function Signup() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [businessName, setBusinessName] = useState('');
-  const [location, setLocation] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [experienceYears, setExperienceYears] = useState('');
+  const [formData, setFormData] = useState<SignupFormData>({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    fullName: '',
+    businessName: '',
+    location: '',
+    phoneNumber: '',
+    experienceYears: '',
+  });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validation
-    if (!fullName.trim()) {
-      setError('Full name is required');
+        // Validation
+    if (!formData.fullName.trim()) {
+      setError('Please enter your full name');
       return;
     }
 
-    if (!email.trim()) {
-      setError('Email is required');
+    if (!formData.email.trim()) {
+      setError('Please enter your email');
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
       return;
     }
 
-    if (!businessName.trim()) {
-      setError('Business name is required');
+    if (!formData.businessName.trim()) {
+      setError('Please enter your business name');
       return;
     }
 
-    if (!location.trim()) {
-      setError('Location is required');
+    if (!formData.location.trim()) {
+      setError('Please enter your location');
       return;
     }
 
-    if (!phoneNumber.trim()) {
-      setError('Phone number is required');
+    if (!formData.phoneNumber.trim()) {
+      setError('Please enter your phone number');
       return;
     }
 
     setLoading(true);
 
     try {
-      await signUp(email, password, fullName, 'FARMER', {
-        businessName: businessName.trim(),
-        location: location.trim(),
-        phoneNumber: phoneNumber.trim(),
-        experienceYears: experienceYears ? parseInt(experienceYears) : 0,
+      await signUp(formData.email, formData.password, formData.fullName, 'FARMER', {
+        businessName: formData.businessName.trim(),
+        location: formData.location.trim(),
+        phoneNumber: formData.phoneNumber.trim(),
+        experienceYears: formData.experienceYears ? parseInt(formData.experienceYears) : 0,
       });
       
       // Show success message
@@ -118,8 +139,9 @@ export function Signup() {
               <input
                 id="fullName"
                 type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                value={formData.fullName}
+                onChange={handleInputChange}
+                name="fullName"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                 placeholder="John Doe"
@@ -133,8 +155,9 @@ export function Signup() {
               <input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleInputChange}
+                name="email"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                 placeholder="you@example.com"
@@ -148,8 +171,9 @@ export function Signup() {
               <input
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={formData.password}
+                onChange={handleInputChange}
+                name="password"
                 required
                 minLength={6}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
@@ -164,8 +188,9 @@ export function Signup() {
               <input
                 id="confirmPassword"
                 type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                name="confirmPassword"
                 required
                 minLength={6}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
@@ -180,8 +205,9 @@ export function Signup() {
               <input
                 id="businessName"
                 type="text"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
+                value={formData.businessName}
+                onChange={handleInputChange}
+                name="businessName"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                 placeholder="e.g., Sunrise Poultry Farm"
@@ -195,8 +221,9 @@ export function Signup() {
               <input
                 id="location"
                 type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                value={formData.location}
+                onChange={handleInputChange}
+                name="location"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                 placeholder="e.g., Nairobi, Kenya"
@@ -210,8 +237,9 @@ export function Signup() {
               <input
                 id="phoneNumber"
                 type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
+                value={formData.phoneNumber}
+                onChange={handleInputChange}
+                name="phoneNumber"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                 placeholder="e.g., +255 123 456 789"
@@ -226,8 +254,9 @@ export function Signup() {
                 id="experienceYears"
                 type="number"
                 min="0"
-                value={experienceYears}
-                onChange={(e) => setExperienceYears(e.target.value)}
+                value={formData.experienceYears}
+                onChange={handleInputChange}
+                name="experienceYears"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                 placeholder="0"
