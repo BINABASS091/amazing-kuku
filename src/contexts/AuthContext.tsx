@@ -133,18 +133,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: data.user.id,
           email: data.user.email || email,
           full_name: fullName,
-          phone: farmerDetails?.phoneNumber || null,
           role,
         });
 
       if (profileError) {
         console.error('Profile creation error:', profileError);
-        // If profile creation fails, clean up by deleting the auth user
-        try {
-          await supabase.auth.admin.deleteUser(data.user.id);
-        } catch (cleanupError) {
-          console.error('Failed to cleanup auth user:', cleanupError);
-        }
         throw new Error(`Failed to create user profile: ${profileError.message}`);
       }
 
