@@ -81,26 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) throw error;
 
-    if (data.user) {
-      const { data: userData } = await supabase
-        .from('users')
-        .select('id, role')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      if (userData?.role === 'FARMER') {
-        const { data: farmerData } = await supabase
-          .from('farmers')
-          .select('verification_status')
-          .eq('user_id', data.user.id)
-          .maybeSingle();
-
-        if (farmerData && farmerData.verification_status !== 'VERIFIED') {
-          await supabase.auth.signOut();
-          throw new Error('FARMER_NOT_VERIFIED');
-        }
-      }
-    }
+    // No verification check needed - farmers can log in immediately after registration
   };
 
   const signUp = async (
@@ -130,7 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error: profileError } = await supabase
         .from('users')
         .insert({
-          id: data.user.id,
           email: data.user.email || email,
           full_name: fullName,
           role,
@@ -151,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             location: farmerDetails?.location || null,
             phone_number: farmerDetails?.phoneNumber || null,
             experience_years: farmerDetails?.experienceYears || 0,
-            verification_status: 'PENDING',
+            verification_status: 'VERIFIED', // Auto-verify farmers on registration
           });
 
         if (farmerError) {
