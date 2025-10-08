@@ -37,6 +37,13 @@ export function Login() {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
+            <div className="mb-4">
+              <img 
+                src="https://res.cloudinary.com/diyy8h0d9/image/upload/v1759477181/WhatsApp_Image_2025-09-10_at_10.41.48_AM_klrrtu.jpg" 
+                alt="FugajiPro Logo" 
+                className="w-24 h-24 mx-auto rounded-full object-cover shadow-lg"
+              />
+            </div>
             <h1 className="text-3xl font-bold text-green-600 mb-2">Manage Your Poultry</h1>
             <h3 className="text-3xl font-bold text-green-600 mb-2">With FugajiPro</h3>
             <p className="text-gray-600">Sign in to your account</p>
