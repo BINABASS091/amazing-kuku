@@ -133,7 +133,7 @@ export function Signup() {
               <img 
                 src="https://res.cloudinary.com/diyy8h0d9/image/upload/v1759477181/WhatsApp_Image_2025-09-10_at_10.41.48_AM_klrrtu.jpg" 
                 alt="FugajiPro Logo" 
-                className="w-32 h-20 mx-auto rounded-lg object-contain shadow-lg"
+                className="w-42 h-30 mx-auto rounded-lg object-contain shadow-lg"
               />
             </div>
             <h1 className="text-3xl font-bold text-green-600 mb-2">Manage Your Poultry</h1>
