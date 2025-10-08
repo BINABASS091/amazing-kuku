@@ -27,6 +27,7 @@ export function Signup() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -36,6 +37,57 @@ export function Signup() {
       ...prev,
       [name]: value
     }));
+  };
+
+  // Check if Step 1 fields are filled
+  const isStep1Complete = () => {
+    return formData.fullName.trim() && 
+           formData.email.trim() && 
+           formData.password && 
+           formData.confirmPassword;
+  };
+
+  // Check if Step 2 fields are filled
+  const isStep2Complete = () => {
+    return formData.businessName.trim() && 
+           formData.location.trim() && 
+           formData.phoneNumber.trim() && 
+           formData.experienceYears;
+  };
+
+  const handleNextStep = () => {
+    setError('');
+    
+    // Validate Step 1 fields
+    if (!formData.fullName.trim()) {
+      setError('Full name is required');
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      setError('Email is required');
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim().toLowerCase())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    // Move to step 2
+    setCurrentStep(2);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -158,145 +210,194 @@ export function Signup() {
             </div>
           )}
 
+          {/* Step indicator */}
+          <div className="flex items-center justify-center mb-6">
+            <div className="flex items-center space-x-4">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                currentStep >= 1 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'
+              }`}>
+                1
+              </div>
+              <div className={`w-16 h-1 ${currentStep >= 2 ? 'bg-green-600' : 'bg-gray-200'}`}></div>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                currentStep >= 2 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'
+              }`}>
+                2
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
-              </label>
-              <input
-                id="fullName"
-                type="text"
-                value={formData.fullName}
-                onChange={handleInputChange}
-                name="fullName"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="Enter your full name"
-              />
-            </div>
+            {/* Step 1: Basic Account Information */}
+            {currentStep === 1 && (
+              <>
+                <div>
+                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    id="fullName"
+                    type="text"
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    name="fullName"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="Enter your full name"
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                name="email"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="you@example.com"
-              />
-            </div>
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    name="email"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="you@example.com"
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                name="password"
-                required
-                minLength={6}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="At least 6 characters"
-              />
-            </div>
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    name="password"
+                    required
+                    minLength={6}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="At least 6 characters"
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                name="confirmPassword"
-                required
-                minLength={6}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="Re-enter your password"
-              />
-            </div>
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirm Password
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    name="confirmPassword"
+                    required
+                    minLength={6}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="Re-enter your password"
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-2">
-                Business Name
-              </label>
-              <input
-                id="businessName"
-                type="text"
-                value={formData.businessName}
-                onChange={handleInputChange}
-                name="businessName"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="e.g., Sunrise Poultry Farm"
-              />
-            </div>
+                {isStep1Complete() && (
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                  >
+                    Next
+                  </button>
+                )}
+              </>
+            )}
 
-            <div>
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
-                Location
-              </label>
-              <input
-                id="location"
-                type="text"
-                value={formData.location}
-                onChange={handleInputChange}
-                name="location"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="e.g., Mwera, Jumbi"
-              />
-            </div>
+            {/* Step 2: Business Information */}
+            {currentStep === 2 && (
+              <>
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(1)}
+                    className="text-green-600 hover:text-green-700 text-sm font-medium"
+                  >
+                    ← Back to Step 1
+                  </button>
+                </div>
 
-            <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number
-              </label>
-              <input
-                id="phoneNumber"
-                type="tel"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                name="phoneNumber"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="e.g., +255 123 456 789"
-              />
-            </div>
+                <div>
+                  <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-2">
+                    Business Name
+                  </label>
+                  <input
+                    id="businessName"
+                    type="text"
+                    value={formData.businessName}
+                    onChange={handleInputChange}
+                    name="businessName"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="e.g., Sunrise Poultry Farm"
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="experienceYears" className="block text-sm font-medium text-gray-700 mb-2">
-                Years of Experience
-              </label>
-              <input
-                id="experienceYears"
-                type="number"
-                min="0"
-                value={formData.experienceYears}
-                onChange={handleInputChange}
-                name="experienceYears"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="0"
-              />
-            </div>
+                <div>
+                  <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
+                    Location
+                  </label>
+                  <input
+                    id="location"
+                    type="text"
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    name="location"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="e.g., Mwera, Jumbi"
+                  />
+                </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Creating account...' : 'Sign Up'}
-            </button>
+                <div>
+                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    id="phoneNumber"
+                    type="tel"
+                    value={formData.phoneNumber}
+                    onChange={handleInputChange}
+                    name="phoneNumber"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="e.g., +255 123 456 789"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="experienceYears" className="block text-sm font-medium text-gray-700 mb-2">
+                    Years of Experience
+                  </label>
+                  <input
+                    id="experienceYears"
+                    type="number"
+                    min="0"
+                    value={formData.experienceYears}
+                    onChange={handleInputChange}
+                    name="experienceYears"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="0"
+                  />
+                </div>
+
+                {isStep2Complete() && (
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? 'Creating account...' : 'Sign Up'}
+                  </button>
+                )}
+              </>
+            )}
           </form>
 
           <div className="mt-6 text-center">
