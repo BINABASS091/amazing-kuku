@@ -171,7 +171,7 @@ export function Signup() {
                 name="fullName"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="John Doe"
+                placeholder="Enter your full name"
               />
             </div>
 
@@ -253,7 +253,7 @@ export function Signup() {
                 name="location"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                placeholder="e.g., Nairobi, Kenya"
+                placeholder="e.g., Mwera, Jumbi"
               />
             </div>
 
