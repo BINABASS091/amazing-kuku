@@ -37,7 +37,8 @@ export function Login() {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-green-600 mb-2">Manage Your Poultry Farm With FugajiPro</h1>
+            <h1 className="text-3xl font-bold text-green-600 mb-2">Manage Your Poultry</h1>
+            <h2 className="text-3xl font-bold text-green-600 mb-2">With FugajiPro</h2>
             <p className="text-gray-600">Sign in to your account</p>
           </div>
 
