@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { ReactNode, useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -9,6 +9,19 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const location = useLocation();
+
+  // Debug logging
+  useEffect(() => {
+    if (!loading) {
+      console.log('ProtectedRoute - Auth state:', {
+        hasUser: !!user,
+        userRole: user?.role,
+        requiredRole,
+        path: location.pathname
+      });
+    }
+  }, [user, loading, requiredRole, location.pathname]);
 
   if (loading) {
     return (
@@ -19,10 +32,16 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    console.log('ProtectedRoute - No user, redirecting to login');
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (requiredRole && user.role !== requiredRole) {
+  // Normalize role comparison
+  const userRole = (user.role || '').toUpperCase();
+  const normalizedRequiredRole = requiredRole ? requiredRole.toUpperCase() : null;
+
+  if (normalizedRequiredRole && userRole !== normalizedRequiredRole) {
+    console.warn(`ProtectedRoute - Access denied. User role: ${userRole}, Required: ${normalizedRequiredRole}`);
     return <Navigate to="/" replace />;
   }
 

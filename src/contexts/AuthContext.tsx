@@ -13,7 +13,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<string | undefined>;
   signUp: (email: string, password: string, fullName: string, role: 'ADMIN' | 'FARMER', farmerDetails?: FarmerDetails) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -74,15 +74,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Wait for the user profile to be loaded by the auth state change
-    // The App component will handle role-based redirection
+      // Force a profile refresh after successful login
+      if (data?.user?.id) {
+        const profile = await fetchUserProfile(data.user.id);
+        if (profile) {
+          setUser(profile);
+          // Store role in localStorage for immediate access
+          localStorage.setItem('userRole', profile.role || '');
+        }
+        return profile?.role;
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async (

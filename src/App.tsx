@@ -37,10 +37,22 @@ function RootRedirect() {
   }
 
   if (!user) {
+    console.log('No user found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
-  return <Navigate to={user.role === 'ADMIN' ? '/admin' : '/farmer'} replace />;
+  // Safely get and normalize the role
+  const role = (user.role || '').toUpperCase();
+  console.log('RootRedirect - User role:', role);
+  
+  if (role === 'ADMIN') {
+    console.log('RootRedirect - Redirecting to /admin');
+    return <Navigate to="/admin" replace />;
+  }
+  
+  // Default to farmer dashboard for all other roles
+  console.log('RootRedirect - Redirecting to /farmer');
+  return <Navigate to="/farmer" replace />;
 }
 
 function App() {

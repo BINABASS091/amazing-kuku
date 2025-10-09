@@ -16,10 +16,17 @@ export function Login() {
   // Handle redirect after successful authentication
   useEffect(() => {
     if (session && user && !loading) {
-      if (user.role === 'ADMIN') {
-        navigate('/admin');
-      } else if (user.role === 'FARMER') {
-        navigate('/');
+      const role = (user.role || '').toUpperCase();
+      console.log('Auth state changed:', { hasSession: !!session, userRole: role });
+      
+      if (role === 'ADMIN') {
+        console.log('Redirecting to /admin');
+        navigate('/admin', { replace: true });
+      } else if (role === 'FARMER') {
+        console.log('Redirecting to / (farmer)');
+        navigate('/', { replace: true });
+      } else {
+        console.warn('Unknown role, cannot redirect:', role);
       }
     }
   }, [session, user, loading, navigate]);
@@ -30,9 +37,19 @@ export function Login() {
     setLoading(true);
 
     try {
-      await signIn(email, password);
-      // Don't navigate immediately - let the AuthContext handle it
-      // The useEffect in App.tsx will handle role-based redirection
+      const role = await signIn(email, password);
+      // If we have the role immediately, use it for redirection
+      if (role && typeof role === 'string') {
+        const normalizedRole = role.toUpperCase();
+        if (normalizedRole === 'ADMIN') {
+          navigate('/admin', { replace: true });
+          return;
+        } else if (normalizedRole === 'FARMER') {
+          navigate('/', { replace: true });
+          return;
+        }
+      }
+      // If we don't have the role immediately, the useEffect will handle it
     } catch (err: any) {
       if (err.message === 'FARMER_NOT_VERIFIED') {
         setError(t('auth.notVerified'));
