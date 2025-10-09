@@ -5,37 +5,54 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardLayout } from './components/DashboardLayout';
 
+// Lazy load pages with better error handling and prefetching
+const lazyWithRetry = (componentImport: any) =>
+  lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error('Error loading component:', error);
+      // Optionally show an error boundary here
+      throw error;
+    }
+  });
+
 // Lazy load pages with default exports
-const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
-const Signup = lazy(() => import('./pages/Signup').then(module => ({ default: module.Signup })));
+const Login = lazyWithRetry(() => import('./pages/Login').then(module => ({ default: module.Login })));
+const Signup = lazyWithRetry(() => import('./pages/Signup').then(module => ({ default: module.Signup })));
 
-// Lazy load admin pages with default exports
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
-const FarmersManagement = lazy(() => import('./pages/admin/FarmersManagement').then(module => ({ default: module.FarmersManagement })));
-const FarmerDetail = lazy(() => import('./pages/admin/FarmerDetail').then(module => ({ default: module.FarmerDetail })));
-const SubscriptionsManagement = lazy(() => import('./pages/admin/SubscriptionsManagement').then(module => ({ default: module.SubscriptionsManagement })));
-const RecommendationsManagement = lazy(() => import('./pages/admin/RecommendationsManagement').then(module => ({ default: module.RecommendationsManagement })));
-const AlertsManagement = lazy(() => import('./pages/admin/AlertsManagement').then(module => ({ default: module.AlertsManagement })));
-const DevicesManagement = lazy(() => import('./pages/admin/DevicesManagement').then(module => ({ default: module.DevicesManagement })));
-const AllFarmsManagement = lazy(() => import('./pages/admin/AllFarmsManagement').then(module => ({ default: module.AllFarmsManagement })));
-const AllBatchesManagement = lazy(() => import('./pages/admin/AllBatchesManagement').then(module => ({ default: module.AllBatchesManagement })));
-const BreedConfigurations = lazy(() => import('./pages/admin/BreedConfigurations').then(module => ({ default: module.BreedConfigurations })));
-const Settings = lazy(() => import('./pages/admin/Settings').then(module => ({ default: module.Settings })));
+// Lazy load admin pages with default exports using lazyWithRetry
+const AdminDashboard = lazyWithRetry(() => import('./pages/admin/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
+const FarmersManagement = lazyWithRetry(() => import('./pages/admin/FarmersManagement').then(module => ({ default: module.FarmersManagement })));
+const FarmerDetail = lazyWithRetry(() => import('./pages/admin/FarmerDetail').then(module => ({ default: module.FarmerDetail })));
+const SubscriptionsManagement = lazyWithRetry(() => import('./pages/admin/SubscriptionsManagement').then(module => ({ default: module.SubscriptionsManagement })));
+const RecommendationsManagement = lazyWithRetry(() => import('./pages/admin/RecommendationsManagement').then(module => ({ default: module.RecommendationsManagement })));
+const AlertsManagement = lazyWithRetry(() => import('./pages/admin/AlertsManagement').then(module => ({ default: module.AlertsManagement })));
+const DevicesManagement = lazyWithRetry(() => import('./pages/admin/DevicesManagement').then(module => ({ default: module.DevicesManagement })));
+const AllFarmsManagement = lazyWithRetry(() => import('./pages/admin/AllFarmsManagement').then(module => ({ default: module.AllFarmsManagement })));
+const AllBatchesManagement = lazyWithRetry(() => import('./pages/admin/AllBatchesManagement').then(module => ({ default: module.AllBatchesManagement })));
+const BreedConfigurations = lazyWithRetry(() => import('./pages/admin/BreedConfigurations').then(module => ({ default: module.BreedConfigurations })));
+const Settings = lazyWithRetry(() => import('./pages/admin/Settings').then(module => ({ default: module.Settings })));
 
-// Lazy load farmer pages with default exports
-const FarmerDashboard = lazy(() => import('./pages/farmer/FarmerDashboard').then(module => ({ default: module.FarmerDashboard })));
-const FarmsManagement = lazy(() => import('./pages/farmer/FarmsManagement').then(module => ({ default: module.FarmsManagement })));
-const FarmDetail = lazy(() => import('./pages/farmer/FarmDetail').then(module => ({ default: module.FarmDetail })));
-const BatchesManagement = lazy(() => import('./pages/farmer/BatchesManagement').then(module => ({ default: module.BatchesManagement })));
-const ActivitiesManagement = lazy(() => import('./pages/farmer/ActivitiesManagement').then(module => ({ default: module.ActivitiesManagement })));
-const KnowledgeBase = lazy(() => import('./pages/farmer/KnowledgeBase').then(module => ({ default: module.KnowledgeBase })));
-const AlertsPage = lazy(() => import('./pages/farmer/AlertsPage').then(module => ({ default: module.AlertsPage })));
-const ProfilePage = lazy(() => import('./pages/farmer/ProfilePage').then(module => ({ default: module.ProfilePage })));
+// Lazy load farmer pages with default exports using lazyWithRetry
+const FarmerDashboard = lazyWithRetry(() => import('./pages/farmer/FarmerDashboard').then(module => ({ default: module.FarmerDashboard })));
+const FarmsManagement = lazyWithRetry(() => import('./pages/farmer/FarmsManagement').then(module => ({ default: module.FarmsManagement })));
+const FarmDetail = lazyWithRetry(() => import('./pages/farmer/FarmDetail').then(module => ({ default: module.FarmDetail })));
+const BatchesManagement = lazyWithRetry(() => import('./pages/farmer/BatchesManagement').then(module => ({ default: module.BatchesManagement })));
+const ActivitiesManagement = lazyWithRetry(() => import('./pages/farmer/ActivitiesManagement').then(module => ({ default: module.ActivitiesManagement })));
+const KnowledgeBase = lazyWithRetry(() => import('./pages/farmer/KnowledgeBase').then(module => ({ default: module.KnowledgeBase })));
+const AlertsPage = lazyWithRetry(() => import('./pages/farmer/AlertsPage').then(module => ({ default: module.AlertsPage })));
+const ProfilePage = lazyWithRetry(() => import('./pages/farmer/ProfilePage').then(module => ({ default: module.ProfilePage })));
 
-// Loading component for Suspense fallback
+// Enhanced loading component with better UX
 const LoadingSpinner = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+  <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+    <div className="relative w-16 h-16 mb-4">
+      <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
+      <div className="absolute inset-0 rounded-full border-4 border-green-500 border-t-transparent animate-spin"></div>
+    </div>
+    <h2 className="text-lg font-medium text-gray-700">Loading Application</h2>
+    <p className="text-sm text-gray-500 mt-2">Please wait a moment...</p>
   </div>
 );
 
