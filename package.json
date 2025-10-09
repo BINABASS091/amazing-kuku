@@ -21,6 +21,7 @@
     "react-router-dom": "^7.9.3"
   },
   "devDependencies": {
+    "@babel/plugin-transform-react-jsx": "^7.27.1",
     "@eslint/js": "^9.9.1",
     "@supabase/supabase-js": "^2.74.0",
     "@types/node": "^24.7.0",
