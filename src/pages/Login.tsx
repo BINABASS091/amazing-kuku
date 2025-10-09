@@ -16,17 +16,25 @@ export function Login() {
   // Handle redirect after successful authentication
   useEffect(() => {
     if (session && user && !loading) {
-      const role = (user.role || '').toUpperCase();
-      console.log('Auth state changed:', { hasSession: !!session, userRole: role });
+      // Get role from user object or localStorage as fallback
+      const role = (user.role || localStorage.getItem('userRole') || '').toUpperCase();
+      console.log('Auth state changed:', { 
+        hasSession: !!session, 
+        userRole: role,
+        userData: user
+      });
       
       if (role === 'ADMIN') {
-        console.log('Redirecting to /admin');
+        console.log('Admin user detected, redirecting to /admin');
         navigate('/admin', { replace: true });
       } else if (role === 'FARMER') {
-        console.log('Redirecting to / (farmer)');
-        navigate('/', { replace: true });
+        console.log('Farmer user detected, redirecting to /farmer');
+        navigate('/farmer', { replace: true });
       } else {
-        console.warn('Unknown role, cannot redirect:', role);
+        console.warn('Unknown or missing role, cannot redirect. User data:', user);
+        // If we get here, there might be an issue with the user's role in the database
+        // We'll redirect to a safe page or show an error
+        navigate('/login?error=invalid-role');
       }
     }
   }, [session, user, loading, navigate]);

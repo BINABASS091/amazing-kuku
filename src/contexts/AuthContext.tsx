@@ -25,24 +25,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserProfile = async (userId: string, retries = 0): Promise<User | null> => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+  const fetchUserProfile = async (userId: string, retries = 0): Promise<any> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (error) {
+      if (error) throw error;
+
+      // Ensure role is properly set and normalized to uppercase
+      if (data) {
+        data.role = data.role ? data.role.toUpperCase() : 'FARMER';
+        // Store role in localStorage for immediate access
+        localStorage.setItem('userRole', data.role);
+        console.log('Fetched user profile with role:', data.role);
+        return data;
+      }
+
+      return null;
+    } catch (error) {
       console.error('Error fetching user profile:', error);
-
+      // Retry up to 3 times if the profile isn't immediately available
       if (retries < 3) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         return fetchUserProfile(userId, retries + 1);
       }
       return null;
     }
-
-    return data;
   };
 
   useEffect(() => {
@@ -57,17 +68,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })();
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setSession(session);
-        if (session?.user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('Auth state changed:', _event);
+      setSession(session);
+      
+      if (session?.user) {
+        try {
           const profile = await fetchUserProfile(session.user.id);
-          setUser(profile);
-        } else {
+          if (profile) {
+            // Ensure role is properly set and normalized
+            const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
+            const userWithRole = { ...profile, role: userRole };
+            setUser(userWithRole);
+            localStorage.setItem('userRole', userRole);
+            console.log('User state updated with role:', userRole);
+          } else {
+            console.warn('No profile found for user');
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Error updating user profile on auth state change:', error);
           setUser(null);
         }
-        setLoading(false);
-      })();
+      } else {
+        // Clear user data on sign out
+        localStorage.removeItem('userRole');
+        setUser(null);
+      }
+      
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -81,20 +110,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
 
-      if (error) throw error;
-
-      // Force a profile refresh after successful login
-      if (data?.user?.id) {
-        const profile = await fetchUserProfile(data.user.id);
-        if (profile) {
-          setUser(profile);
-          // Store role in localStorage for immediate access
-          localStorage.setItem('userRole', profile.role || '');
-        }
-        return profile?.role;
+      if (error) {
+        console.error('Authentication error:', error);
+        throw error;
       }
+
+      if (!data?.user?.id) {
+        throw new Error('No user ID returned from authentication');
+      }
+
+      // Fetch the latest user profile
+      const profile = await fetchUserProfile(data.user.id);
+      if (!profile) {
+        throw new Error('User profile not found');
+      }
+
+      // Ensure the role is properly set and normalized
+      const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
+      
+      // Update the user state with the profile
+      setUser({
+        ...profile,
+        role: userRole
+      });
+
+      // Store role in localStorage for immediate access
+      localStorage.setItem('userRole', userRole);
+      console.log('User signed in with role:', userRole);
+      
+      return userRole;
     } catch (error) {
       console.error('Sign in error:', error);
+      // Handle specific error cases
+      if (error instanceof Error) {
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password');
+        }
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please verify your email before signing in');
+        }
+      }
       throw error;
     } finally {
       setLoading(false);
