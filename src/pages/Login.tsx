@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -10,8 +10,19 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, user, session } = useAuth();
   const navigate = useNavigate();
+
+  // Handle redirect after successful authentication
+  useEffect(() => {
+    if (session && user && !loading) {
+      if (user.role === 'ADMIN') {
+        navigate('/admin');
+      } else if (user.role === 'FARMER') {
+        navigate('/');
+      }
+    }
+  }, [session, user, loading, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
