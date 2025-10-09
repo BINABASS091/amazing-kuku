@@ -105,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {
+      // First, sign in with email and password
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -119,24 +120,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('No user ID returned from authentication');
       }
 
-      // Fetch the latest user profile
-      const profile = await fetchUserProfile(data.user.id);
+      // Fetch the latest user profile with retry logic
+      let profile = await fetchUserProfile(data.user.id);
+      
+      // If profile doesn't exist yet, create a basic one
       if (!profile) {
-        throw new Error('User profile not found');
+        console.log('No profile found, creating one...');
+        const { data: newProfile, error: profileError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: data.user.id,
+              email: email,
+              full_name: email.split('@')[0],
+              role: 'FARMER' // Default role
+            }
+          ])
+          .select()
+          .single();
+          
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          throw new Error('Failed to create user profile');
+        }
+        
+        profile = newProfile;
       }
 
       // Ensure the role is properly set and normalized
       const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
       
       // Update the user state with the profile
-      setUser({
+      const updatedUser = {
         ...profile,
-        role: userRole
-      });
+        role: userRole,
+        email: profile.email || email,
+        full_name: profile.full_name || email.split('@')[0]
+      };
+      
+      setUser(updatedUser);
 
-      // Store role in localStorage for immediate access
+      // Store user data in localStorage for immediate access
       localStorage.setItem('userRole', userRole);
-      console.log('User signed in with role:', userRole);
+      localStorage.setItem('userData', JSON.stringify(updatedUser));
+      
+      console.log('User signed in with role:', userRole, 'User data:', updatedUser);
       
       return userRole;
     } catch (error) {
