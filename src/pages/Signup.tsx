@@ -242,6 +242,7 @@ export function Signup() {
                     onChange={handleInputChange}
                     name="fullName"
                     required
+                    autoComplete="name"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                     placeholder="Enter your full name"
                   />
@@ -258,6 +259,7 @@ export function Signup() {
                     onChange={handleInputChange}
                     name="email"
                     required
+                    autoComplete="email"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                     placeholder="you@example.com"
                   />
@@ -333,6 +335,7 @@ export function Signup() {
                     onChange={handleInputChange}
                     name="businessName"
                     required
+                    autoComplete="organization"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                     placeholder="e.g., Sunrise Poultry Farm"
                   />
@@ -349,6 +352,7 @@ export function Signup() {
                     onChange={handleInputChange}
                     name="location"
                     required
+                    autoComplete="address-level2"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                     placeholder="e.g., Mwera, Jumbi"
                   />
@@ -365,6 +369,7 @@ export function Signup() {
                     onChange={handleInputChange}
                     name="phoneNumber"
                     required
+                    autoComplete="tel"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                     placeholder="e.g., +255 123 456 789"
                   />
@@ -382,7 +387,8 @@ export function Signup() {
                     onChange={handleInputChange}
                     name="experienceYears"
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    autoComplete="off"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-one transition-colors"
                     placeholder="0"
                   />
                 </div>
