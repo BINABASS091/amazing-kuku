@@ -25,228 +25,117 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserProfile = async (userId: string, retries = 0): Promise<any> => {
+  const fetchUserProfile = async (userId: string): Promise<any> => {
     try {
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      // Ensure role is properly set and normalized to uppercase
       if (data) {
         data.role = data.role ? data.role.toUpperCase() : 'FARMER';
-        // Store role in localStorage for immediate access
         localStorage.setItem('userRole', data.role);
-        console.log('Fetched user profile with role:', data.role);
         return data;
       }
 
       return null;
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      // Retry up to 3 times if the profile isn't immediately available
-      if (retries < 3) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return fetchUserProfile(userId, retries + 1);
-      }
       return null;
     }
   };
 
   useEffect(() => {
-    console.log('[AuthContext] Initial auth check');
-    
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('[AuthContext] Initial session check:', { hasSession: !!session, userId: session?.user?.id });
-      (async () => {
+    let mounted = true;
+
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
         setSession(session);
         if (session?.user) {
-          console.log('[AuthContext] Fetching user profile for:', session.user.id);
           const profile = await fetchUserProfile(session.user.id);
-          console.log('[AuthContext] Fetched profile:', { hasProfile: !!profile, role: profile?.role });
-          setUser(profile);
-        } else {
-          console.log('[AuthContext] No active session found');
-        }
-        setLoading(false);
-      })();
-    }).catch(error => {
-      console.error('[AuthContext] Error getting initial session:', error);
-      setLoading(false);
-    });
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('[AuthContext] Auth state changed:', { 
-        event: _event, 
-        hasSession: !!session,
-        userId: session?.user?.id 
-      });
-      
-      setSession(session);
-      
-      if (session?.user) {
-        try {
-          console.log('[AuthContext] User authenticated, fetching profile...');
-          const profile = await fetchUserProfile(session.user.id);
-          
-          if (profile) {
-            // Ensure role is properly set and normalized
+          if (mounted && profile) {
             const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
-            const userWithRole = { 
-              ...profile, 
-              role: userRole,
-              email: profile.email || session.user.email,
-              id: profile.id || session.user.id
-            };
-            
-            console.log('[AuthContext] Updating user state with role:', userRole);
-            setUser(userWithRole);
-            localStorage.setItem('userRole', userRole);
-            localStorage.setItem('userData', JSON.stringify(userWithRole));
-          } else {
-            console.warn('[AuthContext] No profile found for user');
-            setUser(null);
+            setUser({ ...profile, role: userRole });
           }
-        } catch (error) {
-          console.error('[AuthContext] Error updating user profile:', error);
-          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth init error:', error);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+
+      setSession(session);
+
+      if (session?.user) {
+        const profile = await fetchUserProfile(session.user.id);
+        if (mounted && profile) {
+          const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
+          setUser({ ...profile, role: userRole });
         }
       } else {
-        console.log('[AuthContext] No active session, clearing user data');
-        // Clear user data on sign out
         localStorage.removeItem('userRole');
         localStorage.removeItem('userData');
         setUser(null);
       }
-      
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log('[AuthContext] Starting sign in process for:', email);
     setLoading(true);
-    
+
     try {
-      // Clear any existing auth state
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('userData');
-      setUser(null);
-      setSession(null);
-      
-      console.log('[AuthContext] Attempting to authenticate with Supabase...');
-      
-      // Sign in with Supabase
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (signInError) {
-        console.error('[AuthContext] Authentication error:', signInError);
-        throw signInError;
-      }
+      if (signInError) throw signInError;
+      if (!data?.user?.id) throw new Error('No user ID returned');
 
-      if (!data?.user?.id) {
-        const error = new Error('No user ID returned from authentication');
-        console.error('[AuthContext]', error.message);
-        throw error;
-      }
+      const profile = await fetchUserProfile(data.user.id);
 
-      console.log('[AuthContext] User authenticated, ID:', data.user.id);
-      
-      // Fetch the user profile with retry logic
-      console.log('[AuthContext] Fetching user profile...');
-      let profile = await fetchUserProfile(data.user.id);
-      
-      // If profile doesn't exist, try to create one
       if (!profile) {
-        console.log('[AuthContext] No profile found, creating one...');
-        try {
-          // First, try to insert the new user
-          const { data: newProfile, error: insertError } = await supabase
-            .from('users')
-            .insert({
-              id: data.user.id,
-              email: email,
-              full_name: email.split('@')[0],
-              role: 'FARMER', // Default role
-              created_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-            
-          if (insertError) {
-            // If the error is because the user already exists (but we couldn't fetch it), try to fetch again
-            if (insertError.code === '23505') { // Unique violation
-              console.log('[AuthContext] User exists but couldn\'t fetch, retrying...');
-              profile = await fetchUserProfile(data.user.id);
-              if (!profile) {
-                throw new Error('User exists but profile could not be retrieved');
-              }
-            } else {
-              throw insertError;
-            }
-          } else {
-            profile = newProfile;
-            console.log('[AuthContext] Created new user profile');
-          }
-        } catch (profileError) {
-          console.error('[AuthContext] Error in profile creation/retrieval:', profileError);
-          // Try one more time to fetch the profile in case it was created but not returned
-          profile = await fetchUserProfile(data.user.id);
-          if (!profile) {
-            throw new Error('Failed to set up user profile: ' + (profileError instanceof Error ? profileError.message : String(profileError)));
-          }
+        const { data: newProfile, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            email: email,
+            full_name: email.split('@')[0],
+            role: 'FARMER',
+          })
+          .select()
+          .maybeSingle();
+
+        if (insertError && insertError.code !== '23505') {
+          throw insertError;
         }
       }
 
-      // Ensure the role is properly set and normalized
       const userRole = profile?.role ? profile.role.toUpperCase() : 'FARMER';
-      
-      // Update the user state with the profile
-      const updatedUser = {
-        ...data.user,
-        ...profile,
-        role: userRole,
-        email: profile?.email || email,
-        full_name: profile?.full_name || email.split('@')[0],
-        id: data.user.id
-      };
-      
-      console.log('[AuthContext] Updating user state with:', updatedUser);
-      setUser(updatedUser);
-      setSession(data.session);
-
-      // Store user data in localStorage for immediate access
-      localStorage.setItem('userRole', userRole);
-      localStorage.setItem('userData', JSON.stringify(updatedUser));
-      
-      console.log('[AuthContext] User signed in successfully with role:', userRole);
       return userRole;
-      
+
     } catch (error) {
-      console.error('Sign in error:', error);
-      // Clear any partial state on error
-      setUser(null);
-      setSession(null);
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('userData');
-      
-      // Handle specific error cases
       if (error instanceof Error) {
         if (error.message.includes('Invalid login credentials')) {
           throw new Error('Invalid email or password');
-        }
-        if (error.message.includes('Email not confirmed')) {
-          throw new Error('Please verify your email before signing in');
         }
       }
       throw error;

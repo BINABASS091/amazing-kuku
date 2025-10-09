@@ -44,42 +44,20 @@ const KnowledgeBase = lazyWithRetry(() => import('./pages/farmer/KnowledgeBase')
 const AlertsPage = lazyWithRetry(() => import('./pages/farmer/AlertsPage').then(module => ({ default: module.AlertsPage })));
 const ProfilePage = lazyWithRetry(() => import('./pages/farmer/ProfilePage').then(module => ({ default: module.ProfilePage })));
 
-// Enhanced loading component with better UX
 const LoadingSpinner = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-    <div className="relative w-16 h-16 mb-4">
-      <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
-      <div className="absolute inset-0 rounded-full border-4 border-green-500 border-t-transparent animate-spin"></div>
-    </div>
-    <h2 className="text-lg font-medium text-gray-700">Loading Application</h2>
-    <p className="text-sm text-gray-500 mt-2">Please wait a moment...</p>
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
   </div>
 );
 
 function RootRedirect() {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  if (loading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/login" replace />;
 
-  if (!user) {
-    console.log('No user found, redirecting to login');
-    return <Navigate to="/login" replace />;
-  }
-
-  // Safely get and normalize the role
   const role = (user.role || '').toUpperCase();
-  console.log('RootRedirect - User role:', role);
-  
-  if (role === 'ADMIN') {
-    console.log('RootRedirect - Redirecting to /admin');
-    return <Navigate to="/admin" replace />;
-  }
-  
-  // Default to farmer dashboard for all other roles
-  console.log('RootRedirect - Redirecting to /farmer');
-  return <Navigate to="/farmer" replace />;
+  return <Navigate to={role === 'ADMIN' ? '/admin' : '/farmer'} replace />;
 }
 
 function App() {
