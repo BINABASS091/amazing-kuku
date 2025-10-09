@@ -81,7 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) throw error;
 
-    // No verification check needed - farmers can log in immediately after registration
+    // Wait for the user profile to be loaded by the auth state change
+    // The App component will handle role-based redirection
   };
 
   const signUp = async (

@@ -20,7 +20,8 @@ export function Login() {
 
     try {
       await signIn(email, password);
-      navigate('/');
+      // Don't navigate immediately - let the AuthContext handle it
+      // The useEffect in App.tsx will handle role-based redirection
     } catch (err: any) {
       if (err.message === 'FARMER_NOT_VERIFIED') {
         setError(t('auth.notVerified'));
