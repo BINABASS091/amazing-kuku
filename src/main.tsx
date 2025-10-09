@@ -1,6 +1,5 @@
 import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
@@ -19,12 +18,10 @@ const LoadingFallback = () => (
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <Suspense fallback={<LoadingFallback />}>
-          <App />
-        </Suspense>
-      </AuthProvider>
-    </BrowserRouter>
+    <AuthProvider>
+      <Suspense fallback={<LoadingFallback />}>
+        <App />
+      </Suspense>
+    </AuthProvider>
   </StrictMode>
 );
