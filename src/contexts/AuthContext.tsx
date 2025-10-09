@@ -105,7 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {
-      // First, sign in with email and password
+      console.log('Attempting to sign in with email:', email);
+      
+      // Sign in with Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -120,55 +122,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('No user ID returned from authentication');
       }
 
-      // Fetch the latest user profile with retry logic
+      console.log('User authenticated, fetching profile for user ID:', data.user.id);
+      
+      // Fetch the user profile with retry logic
       let profile = await fetchUserProfile(data.user.id);
       
-      // If profile doesn't exist yet, create a basic one
+      // If profile doesn't exist, try to create one with the correct table name
       if (!profile) {
         console.log('No profile found, creating one...');
-        const { data: newProfile, error: profileError } = await supabase
-          .from('users')
-          .insert([
-            {
-              id: data.user.id,
-              email: email,
-              full_name: email.split('@')[0],
-              role: 'FARMER' // Default role
-            }
-          ])
-          .select()
-          .single();
-          
-        if (profileError) {
-          console.error('Error creating user profile:', profileError);
-          throw new Error('Failed to create user profile');
+        try {
+          const { data: newProfile, error: insertError } = await supabase
+            .from('users')  // Make sure this matches your actual table name
+            .insert([
+              {
+                id: data.user.id,
+                email: email,
+                full_name: email.split('@')[0],
+                role: 'FARMER' // Default role
+              }
+            ])
+            .select()
+            .single();
+            
+          if (insertError) {
+            console.error('Error creating user profile:', insertError);
+            // Try to fetch again in case the insert succeeded but didn't return data
+            profile = await fetchUserProfile(data.user.id);
+            if (!profile) throw new Error('Failed to create or fetch user profile');
+          } else {
+            profile = newProfile;
+          }
+        } catch (profileError) {
+          console.error('Error in profile creation:', profileError);
+          throw new Error('Failed to set up user profile');
         }
-        
-        profile = newProfile;
       }
 
       // Ensure the role is properly set and normalized
-      const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
+      const userRole = profile?.role ? profile.role.toUpperCase() : 'FARMER';
       
       // Update the user state with the profile
       const updatedUser = {
+        ...data.user,
         ...profile,
         role: userRole,
-        email: profile.email || email,
-        full_name: profile.full_name || email.split('@')[0]
+        email: profile?.email || email,
+        full_name: profile?.full_name || email.split('@')[0]
       };
       
+      console.log('Updating user state with:', updatedUser);
       setUser(updatedUser);
+      setSession(data.session);
 
       // Store user data in localStorage for immediate access
       localStorage.setItem('userRole', userRole);
       localStorage.setItem('userData', JSON.stringify(updatedUser));
       
-      console.log('User signed in with role:', userRole, 'User data:', updatedUser);
-      
+      console.log('User signed in successfully with role:', userRole);
       return userRole;
+      
     } catch (error) {
       console.error('Sign in error:', error);
+      // Clear any partial state on error
+      setUser(null);
+      setSession(null);
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userData');
+      
       // Handle specific error cases
       if (error instanceof Error) {
         if (error.message.includes('Invalid login credentials')) {
