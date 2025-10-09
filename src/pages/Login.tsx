@@ -16,56 +16,57 @@ export function Login() {
 
   // Handle redirect after successful authentication
   useEffect(() => {
+    console.log('Auth state updated:', { 
+      hasSession: !!session, 
+      user,
+      loading,
+      currentPath: window.location.pathname
+    });
+
     const checkAuthAndRedirect = async () => {
-      if (session && !loading) {
-        // Try to get role from multiple sources
-        let role = '';
-        
-        // 1. Check user object from context
-        if (user?.role) {
-          role = user.role.toUpperCase();
-        } 
-        // 2. Check localStorage
-        else if (localStorage.getItem('userRole')) {
-          role = localStorage.getItem('userRole')?.toUpperCase() || '';
-        }
-        // 3. If still no role, try to fetch it
-        else if (session.user?.id) {
-          try {
-            const { data: profile, error } = await supabase
-              .from('users')
-              .select('role')
-              .eq('id', session.user.id)
-              .single();
-              
-            if (!error && profile?.role) {
-              role = profile.role.toUpperCase();
-              // Update localStorage for future use
-              localStorage.setItem('userRole', role);
-            }
-          } catch (err) {
-            console.error('Error fetching user role:', err);
+      if (!session || loading) return;
+      
+      console.log('Checking auth and redirecting...');
+      
+      // Try to get role from multiple sources
+      let role = user?.role?.toUpperCase() || 
+                localStorage.getItem('userRole')?.toUpperCase() ||
+                '';
+      
+      // If still no role, try to fetch it from the database
+      if (!role && session.user?.id) {
+        console.log('No role found, fetching from database...');
+        try {
+          const { data: profile, error } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (!error && profile?.role) {
+            role = profile.role.toUpperCase();
+            localStorage.setItem('userRole', role);
+            console.log('Fetched role from database:', role);
           }
+        } catch (err) {
+          console.error('Error fetching user role:', err);
         }
-        
-        console.log('Auth state changed:', { 
-          hasSession: !!session, 
-          userRole: role,
-          userData: user,
-          sessionUser: session.user
-        });
-        
-        // Handle redirection based on role
-        if (role === 'ADMIN') {
-          console.log('Admin user detected, redirecting to /admin');
-          navigate('/admin', { replace: true });
-        } else if (role) {
-          console.log('User detected, redirecting to /farmer');
-          navigate('/farmer', { replace: true });
-        } else {
-          console.warn('No role found, using default route');
-          navigate('/farmer', { replace: true });
-        }
+      }
+      
+      // Default to FARMER if no role is found
+      const finalRole = role || 'FARMER';
+      
+      console.log('Auth check complete:', { 
+        hasSession: !!session, 
+        finalRole,
+        currentPath: window.location.pathname
+      });
+      
+      // Only redirect if we're still on the login page
+      if (window.location.pathname === '/login') {
+        const targetPath = finalRole === 'ADMIN' ? '/admin' : '/farmer';
+        console.log(`Redirecting to: ${targetPath}`);
+        navigate(targetPath, { replace: true });
       }
     };
     
@@ -76,26 +77,32 @@ export function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    
+    console.log('Login attempt started for:', email);
 
     try {
       const role = await signIn(email, password);
       console.log('Sign in successful, role from signIn:', role);
       
-      // The useEffect will handle the redirection based on the updated auth state
-      // We don't need to navigate here as the effect will trigger with the new session
+      // Show loading state for a better UX
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Just in case the effect doesn't trigger, set a small timeout
-      setTimeout(() => {
-        if (session && user) {
-          const finalRole = (user.role || role || '').toUpperCase();
-          console.log('Final role after timeout:', finalRole);
-          if (finalRole === 'ADMIN') {
-            navigate('/admin', { replace: true });
-          } else {
-            navigate('/farmer', { replace: true });
-          }
+      // The useEffect should handle the redirection, but we'll add a fallback
+      const checkAndNavigate = (attempts = 0) => {
+        if (attempts > 10) {
+          console.warn('Redirection timeout, forcing navigation...');
+          const finalRole = (user?.role || role || 'FARMER').toUpperCase();
+          navigate(finalRole === 'ADMIN' ? '/admin' : '/farmer', { replace: true });
+          return;
         }
-      }, 1000);
+        
+        if (window.location.pathname === '/login') {
+          console.log('Still on login page, checking again...', { attempt: attempts + 1 });
+          setTimeout(() => checkAndNavigate(attempts + 1), 500);
+        }
+      };
+      
+      checkAndNavigate();
       
     } catch (err: any) {
       console.error('Login error:', err);

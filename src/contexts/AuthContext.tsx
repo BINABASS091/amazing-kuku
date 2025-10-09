@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserProfile = async (userId: string, retries = 0): Promise<any> => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('users')
         .select('*')
         .eq('id', userId)
         .single();
@@ -57,42 +57,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    console.log('[AuthContext] Initial auth check');
+    
+    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[AuthContext] Initial session check:', { hasSession: !!session, userId: session?.user?.id });
       (async () => {
         setSession(session);
         if (session?.user) {
+          console.log('[AuthContext] Fetching user profile for:', session.user.id);
           const profile = await fetchUserProfile(session.user.id);
+          console.log('[AuthContext] Fetched profile:', { hasProfile: !!profile, role: profile?.role });
           setUser(profile);
+        } else {
+          console.log('[AuthContext] No active session found');
         }
         setLoading(false);
       })();
+    }).catch(error => {
+      console.error('[AuthContext] Error getting initial session:', error);
+      setLoading(false);
     });
 
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('Auth state changed:', _event);
+      console.log('[AuthContext] Auth state changed:', { 
+        event: _event, 
+        hasSession: !!session,
+        userId: session?.user?.id 
+      });
+      
       setSession(session);
       
       if (session?.user) {
         try {
+          console.log('[AuthContext] User authenticated, fetching profile...');
           const profile = await fetchUserProfile(session.user.id);
+          
           if (profile) {
             // Ensure role is properly set and normalized
             const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
-            const userWithRole = { ...profile, role: userRole };
+            const userWithRole = { 
+              ...profile, 
+              role: userRole,
+              email: profile.email || session.user.email,
+              id: profile.id || session.user.id
+            };
+            
+            console.log('[AuthContext] Updating user state with role:', userRole);
             setUser(userWithRole);
             localStorage.setItem('userRole', userRole);
-            console.log('User state updated with role:', userRole);
+            localStorage.setItem('userData', JSON.stringify(userWithRole));
           } else {
-            console.warn('No profile found for user');
+            console.warn('[AuthContext] No profile found for user');
             setUser(null);
           }
         } catch (error) {
-          console.error('Error updating user profile on auth state change:', error);
+          console.error('[AuthContext] Error updating user profile:', error);
           setUser(null);
         }
       } else {
+        console.log('[AuthContext] No active session, clearing user data');
         // Clear user data on sign out
         localStorage.removeItem('userRole');
+        localStorage.removeItem('userData');
         setUser(null);
       }
       
@@ -103,58 +131,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    console.log('[AuthContext] Starting sign in process for:', email);
     setLoading(true);
+    
     try {
-      console.log('Attempting to sign in with email:', email);
+      // Clear any existing auth state
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userData');
+      setUser(null);
+      setSession(null);
+      
+      console.log('[AuthContext] Attempting to authenticate with Supabase...');
       
       // Sign in with Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        console.error('Authentication error:', error);
-        throw error;
+      if (signInError) {
+        console.error('[AuthContext] Authentication error:', signInError);
+        throw signInError;
       }
 
       if (!data?.user?.id) {
-        throw new Error('No user ID returned from authentication');
+        const error = new Error('No user ID returned from authentication');
+        console.error('[AuthContext]', error.message);
+        throw error;
       }
 
-      console.log('User authenticated, fetching profile for user ID:', data.user.id);
+      console.log('[AuthContext] User authenticated, ID:', data.user.id);
       
       // Fetch the user profile with retry logic
+      console.log('[AuthContext] Fetching user profile...');
       let profile = await fetchUserProfile(data.user.id);
       
-      // If profile doesn't exist, try to create one with the correct table name
+      // If profile doesn't exist, try to create one
       if (!profile) {
-        console.log('No profile found, creating one...');
+        console.log('[AuthContext] No profile found, creating one...');
         try {
+          // First, try to insert the new user
           const { data: newProfile, error: insertError } = await supabase
-            .from('users')  // Make sure this matches your actual table name
-            .insert([
-              {
-                id: data.user.id,
-                email: email,
-                full_name: email.split('@')[0],
-                role: 'FARMER' // Default role
-              }
-            ])
+            .from('users')
+            .insert({
+              id: data.user.id,
+              email: email,
+              full_name: email.split('@')[0],
+              role: 'FARMER', // Default role
+              created_at: new Date().toISOString()
+            })
             .select()
             .single();
             
           if (insertError) {
-            console.error('Error creating user profile:', insertError);
-            // Try to fetch again in case the insert succeeded but didn't return data
-            profile = await fetchUserProfile(data.user.id);
-            if (!profile) throw new Error('Failed to create or fetch user profile');
+            // If the error is because the user already exists (but we couldn't fetch it), try to fetch again
+            if (insertError.code === '23505') { // Unique violation
+              console.log('[AuthContext] User exists but couldn\'t fetch, retrying...');
+              profile = await fetchUserProfile(data.user.id);
+              if (!profile) {
+                throw new Error('User exists but profile could not be retrieved');
+              }
+            } else {
+              throw insertError;
+            }
           } else {
             profile = newProfile;
+            console.log('[AuthContext] Created new user profile');
           }
         } catch (profileError) {
-          console.error('Error in profile creation:', profileError);
-          throw new Error('Failed to set up user profile');
+          console.error('[AuthContext] Error in profile creation/retrieval:', profileError);
+          // Try one more time to fetch the profile in case it was created but not returned
+          profile = await fetchUserProfile(data.user.id);
+          if (!profile) {
+            throw new Error('Failed to set up user profile: ' + (profileError instanceof Error ? profileError.message : String(profileError)));
+          }
         }
       }
 
@@ -167,10 +217,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...profile,
         role: userRole,
         email: profile?.email || email,
-        full_name: profile?.full_name || email.split('@')[0]
+        full_name: profile?.full_name || email.split('@')[0],
+        id: data.user.id
       };
       
-      console.log('Updating user state with:', updatedUser);
+      console.log('[AuthContext] Updating user state with:', updatedUser);
       setUser(updatedUser);
       setSession(data.session);
 
@@ -178,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('userRole', userRole);
       localStorage.setItem('userData', JSON.stringify(updatedUser));
       
-      console.log('User signed in successfully with role:', userRole);
+      console.log('[AuthContext] User signed in successfully with role:', userRole);
       return userRole;
       
     } catch (error) {
