@@ -77,8 +77,7 @@ export function DevicesManagement() {
             farmer:farmers(
               user:users(full_name)
             )
-          ),
-          batch:batches(batch_number)
+          )
         `)
         .order('created_at', { ascending: false });
 
