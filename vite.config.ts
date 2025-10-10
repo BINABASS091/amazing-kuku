@@ -10,20 +10,28 @@ export default defineConfig(({ mode }) => {
     build: {
       target: 'esnext',
       minify: isProduction ? 'terser' : false,
-      sourcemap: !isProduction,
+      sourcemap: isProduction ? 'hidden' : true,
+      cssCodeSplit: true,
+      reportCompressedSize: false,
       rollupOptions: {
         output: {
           manualChunks: (id) => {
             if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              // Core libraries
+              if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
                 return 'vendor-react';
               }
-              if (id.includes('lucide-react')) {
-                return 'vendor-ui';
+              if (id.includes('react-router-dom')) {
+                return 'vendor-router';
               }
               if (id.includes('@supabase')) {
                 return 'vendor-supabase';
               }
+              // UI libraries
+              if (id.includes('lucide-react') || id.includes('@radix-ui')) {
+                return 'vendor-ui';
+              }
+              // Other node modules
               return 'vendor-other';
             }
             
@@ -39,6 +47,15 @@ export default defineConfig(({ mode }) => {
         },
       },
       chunkSizeWarningLimit: 1000,
+      terserOptions: isProduction ? {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+        format: {
+          comments: false,
+        },
+      } : {},
     },
     plugins: [
       react({

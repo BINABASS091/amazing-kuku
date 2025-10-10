@@ -1,6 +1,31 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from 'react';
 import { supabase, User } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
+
+// Extend the User type to include our custom fields
+type AppUser = User & {
+  user_metadata?: {
+    full_name?: string;
+    avatar_url?: string;
+    [key: string]: any;
+  };
+  app_metadata?: {
+    provider?: string;
+    [key: string]: any;
+  };
+};
+
+interface Profile {
+  id: string;
+  email: string;
+  role: 'ADMIN' | 'FARMER';
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  created_at?: string;
+  updated_at?: string;
+  farmer_details?: FarmerDetails | null;
+}
 
 interface FarmerDetails {
   businessName?: string;
@@ -11,223 +36,270 @@ interface FarmerDetails {
 
 interface AuthContextType {
   session: Session | null;
-  user: User | null;
+  user: AppUser | null;
+  profile: Profile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<string | undefined>;
-  signUp: (email: string, password: string, fullName: string, role: 'ADMIN' | 'FARMER', farmerDetails?: FarmerDetails) => Promise<void>;
-  signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, userData: Partial<Profile>) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<{ error: Error | null }>;
+  updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserProfile = async (userId: string): Promise<any> => {
+  const fetchUserProfile = useCallback(async (userId: string, retries = 0): Promise<Profile | null> => {
     try {
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', userId)
-        .maybeSingle();
+        .single();
 
       if (error) throw error;
 
+      // Ensure role is properly set and normalized to uppercase
       if (data) {
-        data.role = data.role ? data.role.toUpperCase() : 'FARMER';
-        localStorage.setItem('userRole', data.role);
-        return data;
+        const role = data.role ? (data.role as string).toUpperCase() : 'FARMER';
+        // Store role in localStorage for immediate access
+        localStorage.setItem('userRole', role);
+        console.log('Fetched user profile with role:', role);
+        
+        const profileData: Profile = {
+          id: data.id,
+          email: data.email,
+          role: role as 'ADMIN' | 'FARMER',
+          first_name: data.first_name,
+          last_name: data.last_name,
+          phone: data.phone,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          farmer_details: data.farmer_details
+        };
+        
+        setProfile(profileData);
+        return profileData;
       }
 
       return null;
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      // Retry up to 3 times if the profile isn't immediately available
+      if (retries < 3) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return fetchUserProfile(userId, retries + 1);
+      }
       return null;
     }
-  };
+  }, [setProfile]);
 
+  // Memoize the fetch profile function to prevent recreation on each render
+  const fetchAndSetProfile = useCallback(async (userId: string) => {
+    try {
+      const profile = await fetchUserProfile(userId);
+      if (profile) {
+        // Update user state with minimal required fields
+        setUser({
+          id: userId,
+          email: profile.email || '',
+          user_metadata: {
+            full_name: [profile.first_name, profile.last_name].filter(Boolean).join(' '),
+            avatar_url: undefined
+          },
+          app_metadata: {
+            provider: 'email'
+          },
+          role: profile.role
+        } as AppUser);
+      }
+      return profile;
+    } catch (error) {
+      console.error('[AuthContext] Error fetching profile:', error);
+      return null;
+    }
+  }, []);
+
+  // Handle initial auth check
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
 
-    const initAuth = async () => {
+    const getInitialSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!mounted) return;
-
-        setSession(session);
-        if (session?.user) {
-          const profile = await fetchUserProfile(session.user.id);
-          if (mounted && profile) {
-            const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
-            setUser({ ...profile, role: userRole });
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (isMounted) {
+          setSession(initialSession);
+          
+          if (initialSession?.user) {
+            await fetchAndSetProfile(initialSession.user.id);
+          } else {
+            setUser(null);
+            setProfile(null);
           }
         }
       } catch (error) {
-        console.error('Auth init error:', error);
+        console.error('Error getting initial session:', error);
       } finally {
-        if (mounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    initAuth();
+    getInitialSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-
-      setSession(session);
-
-      if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id);
-        if (mounted && profile) {
-          const userRole = profile.role ? profile.role.toUpperCase() : 'FARMER';
-          setUser({ ...profile, role: userRole });
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (!isMounted) return;
+        
+        setSession(session);
+        
+        if (session?.user) {
+          await fetchAndSetProfile(session.user.id);
+        } else {
+          setUser(null);
+          setProfile(null);
         }
-      } else {
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userData');
-        setUser(null);
       }
-    });
+    );
 
     return () => {
-      mounted = false;
-      subscription.unsubscribe();
+      isMounted = false;
+      subscription?.unsubscribe();
     };
-  }, []);
+  }, [fetchAndSetProfile]);
 
-  const signIn = async (email: string, password: string) => {
-    setLoading(true);
-
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) throw signInError;
-      if (!data?.user?.id) throw new Error('No user ID returned');
-
-      const profile = await fetchUserProfile(data.user.id);
-
-      if (!profile) {
-        const { data: newProfile, error: insertError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            email: email,
-            full_name: email.split('@')[0],
-            role: 'FARMER',
-          })
-          .select()
-          .maybeSingle();
-
-        if (insertError && insertError.code !== '23505') {
-          throw insertError;
-        }
-      }
-
-      const userRole = profile?.role ? profile.role.toUpperCase() : 'FARMER';
-      return userRole;
-
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password');
-        }
-      }
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signUp = async (
-    email: string,
-    password: string,
-    fullName: string,
-    role: 'ADMIN' | 'FARMER',
-    farmerDetails?: FarmerDetails
-  ) => {
-    try {
-      // First, sign up the user with Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error('Supabase auth signup error:', error);
-        throw error;
-      }
-
-      if (!data.user) {
-        throw new Error('User creation failed - no user data returned');
-      }
-
-      // Create user profile in our users table
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          email: data.user.email || email,
-          full_name: fullName,
-          role,
+  // Clean up the AuthContext value to only include the necessary properties
+  const contextValue = useMemo(() => ({
+    session,
+    user,
+    profile,
+    loading,
+    signIn: async (email: string, password: string) => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
         });
 
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-        throw new Error(`Failed to create user profile: ${profileError.message}`);
-      }
+        if (error) throw error;
+        if (!data.session) throw new Error('No session returned after sign in');
 
-      // If this is a farmer, create the farmer profile
-      if (role === 'FARMER') {
-        const { error: farmerError } = await supabase
-          .from('farmers')
-          .insert({
-            user_id: data.user.id,
-            business_name: farmerDetails?.businessName || null,
-            location: farmerDetails?.location || null,
-            phone_number: farmerDetails?.phoneNumber || null,
-            experience_years: farmerDetails?.experienceYears || 0,
-            verification_status: 'VERIFIED', // Auto-verify farmers on registration
-          });
-
-        if (farmerError) {
-          console.error('Farmer profile creation error:', farmerError);
-          throw new Error(`Failed to create farmer profile: ${farmerError.message}`);
+        // Fetch user profile after successful sign in
+        if (data.user) {
+          await fetchAndSetProfile(data.user.id);
         }
-      }
 
-      // Sign out the user so they need to log in
-      await supabase.auth.signOut();
-      
-    } catch (error: any) {
-      console.error('SignUp error:', error);
-      
-      // Provide more user-friendly error messages
-      if (error.message?.includes('already registered')) {
-        throw new Error('This email is already registered. Please try logging in instead.');
-      } else if (error.message?.includes('Password should be at least')) {
-        throw new Error('Password must be at least 6 characters long.');
-      } else if (error.message?.includes('Unable to validate email address')) {
-        throw new Error('Please enter a valid email address.');
-      } else if (error.message?.includes('duplicate key value')) {
-        throw new Error('An account with this email already exists.');
+        return { error: null };
+      } catch (error) {
+        console.error('Error signing in:', error);
+        return { 
+          error: error instanceof Error ? error : new Error('Failed to sign in')
+        };
+      } finally {
+        setLoading(false);
       }
+    },
+    signUp: async (email: string, password: string, userData: Partial<Profile>) => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              email,
+              role: userData.role || 'FARMER',
+              ...userData
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        // Create profile in the database
+        if (data.user) {
+          const { error: profileError } = await supabase
+            .from('users')
+            .upsert({
+              id: data.user.id,
+              email,
+              ...userData,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (profileError) throw profileError;
+        }
+
+        return { error: null };
+      } catch (error) {
+        console.error('Error signing up:', error);
+        return { 
+          error: error instanceof Error ? error : new Error('Failed to sign up')
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    signOut: async () => {
+      try {
+        setLoading(true);
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        
+        // Clear all auth related state
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+        localStorage.removeItem('userRole');
+        
+        return { error: null };
+      } catch (error) {
+        console.error('Error signing out:', error);
+        return { 
+          error: error instanceof Error ? error : new Error('Failed to sign out')
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    updateProfile: async (updates: Partial<Profile>) => {
+      if (!user) return { error: new Error('Not authenticated') };
       
-      throw error;
+      try {
+        const { error } = await supabase
+          .from('users')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+          
+        if (error) throw error;
+        
+        // Refresh the profile data
+        await fetchUserProfile(user.id);
+        
+        return { error: null };
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        return { 
+          error: error instanceof Error ? error : new Error('Failed to update profile')
+        };
+      }
     }
-  };
-
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  };
+  }), [session, user, profile, loading]);
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
