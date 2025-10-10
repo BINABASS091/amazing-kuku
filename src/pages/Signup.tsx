@@ -154,12 +154,20 @@ export function Signup() {
     setLoading(true);
 
     try {
-      await signUp(trimmedEmail, formData.password, trimmedFullName, 'FARMER', {
-        businessName: trimmedBusinessName,
-        location: trimmedLocation,
-        phoneNumber: trimmedPhoneNumber,
-        experienceYears: formData.experienceYears ? parseInt(formData.experienceYears) : 0,
-      });      // Show success message
+      const { error } = await signUp(trimmedEmail, formData.password, {
+        role: 'FARMER',
+        first_name: trimmedFullName.split(' ')[0] || trimmedFullName,
+        last_name: trimmedFullName.split(' ').slice(1).join(' ') || undefined,
+        phone: trimmedPhoneNumber,
+        farmer_details: {
+          businessName: trimmedBusinessName,
+          location: trimmedLocation,
+          phoneNumber: trimmedPhoneNumber,
+          experienceYears: formData.experienceYears ? parseInt(formData.experienceYears) : 0,
+        }
+      });
+      if (error) throw error;
+      // Show success message
       alert('Account created successfully! Please log in to continue.');
       navigate('/login');
     } catch (err: any) {

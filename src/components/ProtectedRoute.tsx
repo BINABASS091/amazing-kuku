@@ -23,8 +23,9 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const userRole = (user.role || '').toUpperCase();
-  const normalizedRequiredRole = requiredRole ? requiredRole.toUpperCase() : null;
+  const normalize = (v: any) => String(v || '').toUpperCase();
+  const userRole = normalize(user.role);
+  const normalizedRequiredRole = requiredRole ? normalize(requiredRole) : null;
 
   if (normalizedRequiredRole && userRole !== normalizedRequiredRole) {
     return <Navigate to="/" replace />;

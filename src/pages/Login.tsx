@@ -16,6 +16,10 @@ export function Login() {
 
   // Handle redirect after successful authentication
   useEffect(() => {
+    const normalizeRole = (value: any): 'ADMIN' | 'FARMER' => {
+      const upper = String(value || '').toUpperCase();
+      return upper === 'ADMIN' ? 'ADMIN' : 'FARMER';
+    };
     console.log('Auth state updated:', { 
       hasSession: !!session, 
       user,
@@ -28,10 +32,8 @@ export function Login() {
       
       console.log('Checking auth and redirecting...');
       
-      // Try to get role from multiple sources
-      let role = user?.role?.toUpperCase() || 
-                localStorage.getItem('userRole')?.toUpperCase() ||
-                '';
+      // Try to get role from multiple sources and normalize safely
+      let role = normalizeRole(user?.role || localStorage.getItem('userRole') || '');
       
       // If still no role, try to fetch it from the database
       if (!role && session.user?.id) {
@@ -44,7 +46,7 @@ export function Login() {
             .single();
             
           if (!error && profile?.role) {
-            role = profile.role.toUpperCase();
+            role = normalizeRole(profile.role);
             localStorage.setItem('userRole', role);
             console.log('Fetched role from database:', role);
           }
@@ -54,7 +56,7 @@ export function Login() {
       }
       
       // Default to FARMER if no role is found
-      const finalRole = role || 'FARMER';
+      const finalRole = normalizeRole(role || 'FARMER');
       
       console.log('Auth check complete:', { 
         hasSession: !!session, 
@@ -81,8 +83,9 @@ export function Login() {
     console.log('Login attempt started for:', email);
 
     try {
-      const role = await signIn(email, password);
-      console.log('Sign in successful, role from signIn:', role);
+      const { error } = await signIn(email, password);
+      if (error) throw error;
+      console.log('Sign in successful');
       
       // Show loading state for a better UX
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -91,7 +94,7 @@ export function Login() {
       const checkAndNavigate = (attempts = 0) => {
         if (attempts > 10) {
           console.warn('Redirection timeout, forcing navigation...');
-          const finalRole = (user?.role || role || 'FARMER').toUpperCase();
+          const finalRole = normalizeRole(user?.role || localStorage.getItem('userRole') || 'FARMER');
           navigate(finalRole === 'ADMIN' ? '/admin' : '/farmer', { replace: true });
           return;
         }

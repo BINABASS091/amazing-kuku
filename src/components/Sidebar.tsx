@@ -109,7 +109,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           <div className="p-4 border-t border-gray-200">
             <div className="mb-3 px-4">
-              <p className="text-sm font-medium text-gray-900">{user?.full_name}</p>
+              <p className="text-sm font-medium text-gray-900">{(user as any)?.user_metadata?.full_name || user?.email}</p>
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
             <button

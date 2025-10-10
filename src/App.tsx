@@ -1,7 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LanguageProvider } from './contexts/LanguageContext';
+import { useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardLayout } from './components/DashboardLayout';
 
@@ -56,17 +55,15 @@ function RootRedirect() {
   if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
 
-  const role = (user.role || '').toUpperCase();
+  const role = String(user.role || '').toUpperCase();
   return <Navigate to={role === 'ADMIN' ? '/admin' : '/farmer'} replace />;
 }
 
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <LanguageProvider>
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/" element={<RootRedirect />} />
@@ -224,10 +221,8 @@ function App() {
                   </DashboardLayout>
                 </ProtectedRoute>
               } />
-            </Routes>
-          </Suspense>
-        </LanguageProvider>
-      </AuthProvider>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
