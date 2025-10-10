@@ -14,12 +14,13 @@ export function Login() {
   const { signIn, user, session } = useAuth();
   const navigate = useNavigate();
 
+  const normalizeRole = (value: any): 'ADMIN' | 'FARMER' => {
+    const upper = String(value || '').toUpperCase();
+    return upper === 'ADMIN' ? 'ADMIN' : 'FARMER';
+  };
+
   // Handle redirect after successful authentication
   useEffect(() => {
-    const normalizeRole = (value: any): 'ADMIN' | 'FARMER' => {
-      const upper = String(value || '').toUpperCase();
-      return upper === 'ADMIN' ? 'ADMIN' : 'FARMER';
-    };
     console.log('Auth state updated:', { 
       hasSession: !!session, 
       user,
