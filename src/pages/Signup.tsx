@@ -28,7 +28,7 @@ export function Signup() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const { signUp } = useAuth();
+  const { signUp, signInWithProvider } = useAuth();
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,6 +182,14 @@ export function Signup() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogle = async () => {
+    setError('');
+    setLoading(true);
+    const { error } = await signInWithProvider('google');
+    if (error) setError(error.message);
+    setLoading(false);
   };
 
   return (
@@ -415,6 +423,16 @@ export function Signup() {
               </>
             )}
           </form>
+
+          <div className="mt-4">
+            <button
+              onClick={handleGoogle}
+              disabled={loading}
+              className="w-full border border-gray-300 bg-white py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Continue with Google
+            </button>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">

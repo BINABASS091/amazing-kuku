@@ -2,7 +2,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Mail, Loader2, LogIn } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function Login() {
@@ -11,7 +11,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, user, session } = useAuth();
+  const { signIn, signInWithProvider, resendVerification, user, session } = useAuth();
   const navigate = useNavigate();
 
   const normalizeRole = (value: any): 'ADMIN' | 'FARMER' => {
@@ -121,6 +121,20 @@ export function Login() {
     }
   };
 
+  const handleGoogle = async () => {
+    setError('');
+    setLoading(true);
+    const { error } = await signInWithProvider('google');
+    if (error) setError(error.message);
+    setLoading(false);
+  };
+
+  const handleResend = async () => {
+    if (!email) return;
+    const { error } = await resendVerification(email);
+    if (error) setError(error.message);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -183,9 +197,29 @@ export function Login() {
               disabled={loading}
               className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? (
+                <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Signing in...</span>
+              ) : (
+                <span className="inline-flex items-center gap-2"><LogIn className="w-4 h-4" /> Sign In</span>
+              )}
             </button>
           </form>
+
+          <div className="mt-4">
+            <button
+              onClick={handleGoogle}
+              disabled={loading}
+              className="w-full border border-gray-300 bg-white py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Continue with Google
+            </button>
+          </div>
+
+          <div className="mt-3 text-center">
+            <button onClick={handleResend} className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center gap-1">
+              <Mail className="w-4 h-4" /> Resend verification email
+            </button>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">

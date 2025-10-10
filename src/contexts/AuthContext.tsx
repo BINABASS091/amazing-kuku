@@ -43,6 +43,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, userData: Partial<Profile>) => Promise<{ error: Error | null }>;
   signOut: () => Promise<{ error: Error | null }>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
+  signInWithProvider: (provider: 'google') => Promise<{ error: Error | null }>;
+  resendVerification: (email: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -161,6 +163,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         
         if (session?.user) {
+          // Ensure a corresponding profile row exists (id/email/role)
+          try {
+            await supabase
+              .from('users')
+              .upsert({
+                id: session.user.id,
+                email: session.user.email ?? '',
+                role: 'FARMER',
+                updated_at: new Date().toISOString(),
+              }, { onConflict: 'id' });
+          } catch (e) {
+            console.error('Error ensuring profile exists:', e);
+          }
           await fetchAndSetProfile(session.user.id);
         } else {
           setUser(null);
@@ -294,6 +309,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { 
           error: error instanceof Error ? error : new Error('Failed to update profile')
         };
+      }
+    },
+    signInWithProvider: async (provider: 'google') => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo: window.location.origin,
+          }
+        });
+        if (error) throw error;
+        // For OAuth, user will be redirected; return success for caller
+        return { error: null };
+      } catch (error) {
+        console.error('Error with OAuth sign-in:', error);
+        return { error: error instanceof Error ? error : new Error('Failed to sign in with provider') };
+      } finally {
+        setLoading(false);
+      }
+    },
+    resendVerification: async (email: string) => {
+      try {
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email,
+        });
+        if (error) throw error;
+        return { error: null };
+      } catch (error) {
+        console.error('Error resending verification:', error);
+        return { error: error instanceof Error ? error : new Error('Failed to resend verification email') };
       }
     }
   }), [session, user, profile, loading]);
