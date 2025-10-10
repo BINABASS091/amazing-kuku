@@ -58,6 +58,7 @@ export function BreedConfigurations() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [schemaMissing, setSchemaMissing] = useState(false);
   const [view, setView] = useState<'list' | 'stages' | 'milestones'>('list');
   const [selectedBreed, setSelectedBreed] = useState<Breed | null>(null);
   const [showBreedModal, setShowBreedModal] = useState(false);
@@ -136,7 +137,15 @@ export function BreedConfigurations() {
       if (error) throw error;
       setBreeds(data || []);
     } catch (error: any) {
-      setError(error.message);
+      const message = String(error?.message || '');
+      // Handle missing table gracefully (PostgREST 404/PGRST205)
+      if (message.includes('breed_configurations') || message.includes('PGRST205')) {
+        setSchemaMissing(true);
+        setBreeds([]);
+        setError('');
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -390,6 +399,23 @@ export function BreedConfigurations() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  if (schemaMissing) {
+    return (
+      <div>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Breed Configurations</h1>
+            <p className="text-gray-600 mt-2">Manage poultry breeds and farming guidance</p>
+          </div>
+        </div>
+        <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-900">
+          <p className="font-semibold mb-1">Setup required</p>
+          <p className="text-sm">The table 'breed_configurations' is not available on your Supabase project yet. Apply the migrations that create breed tables and reload the API config. This page will start working automatically once the schema is present.</p>
+        </div>
       </div>
     );
   }
