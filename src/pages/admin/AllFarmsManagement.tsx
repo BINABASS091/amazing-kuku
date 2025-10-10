@@ -70,7 +70,7 @@ export function AllFarmsManagement() {
           farmer:farmers(
             id,
             business_name,
-            user:users(full_name, email, phone)
+            user:users(full_name, email)
           )
         `)
         .order('created_at', { ascending: false });
