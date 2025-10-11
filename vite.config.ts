@@ -2,11 +2,17 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import compression from 'vite-plugin-compression';
+import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production';
   
   return {
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
     build: {
       target: 'esnext',
       minify: isProduction ? 'terser' : false,

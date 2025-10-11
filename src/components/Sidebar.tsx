@@ -11,7 +11,8 @@ import {
   LogOut,
   Bell,
   Lightbulb,
-  Bird
+  Bird,
+  Activity
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -44,6 +45,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: '/farmer/farms', icon: Warehouse, label: t('sidebar.myFarms') },
     { to: '/farmer/batches', icon: Package, label: t('sidebar.batches') },
     { to: '/farmer/activities', icon: BookOpen, label: t('sidebar.activities') },
+    { to: '/disease-prediction', icon: Activity, label: 'Disease Prediction' },
     { to: '/farmer/knowledge', icon: Lightbulb, label: t('sidebar.knowledgeBase') },
     { to: '/farmer/alerts', icon: Bell, label: t('sidebar.alerts') },
     { to: '/farmer/profile', icon: Settings, label: t('common.profile') },

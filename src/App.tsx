@@ -1,4 +1,5 @@
 import { Suspense, lazy } from 'react';
+import { ToastProvider } from './components/ui/toast';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -39,6 +40,7 @@ const FarmsManagement = lazyWithRetry(() => import('./pages/farmer/FarmsManageme
 const FarmDetail = lazyWithRetry(() => import('./pages/farmer/FarmDetail').then(module => ({ default: module.FarmDetail })));
 const BatchesManagement = lazyWithRetry(() => import('./pages/farmer/BatchesManagement').then(module => ({ default: module.BatchesManagement })));
 const ActivitiesManagement = lazyWithRetry(() => import('./pages/farmer/ActivitiesManagement').then(module => ({ default: module.ActivitiesManagement })));
+const DiseasePrediction = lazyWithRetry(() => import('./pages/disease-prediction').then(module => ({ default: module.default })));
 const KnowledgeBase = lazyWithRetry(() => import('./pages/farmer/KnowledgeBase').then(module => ({ default: module.KnowledgeBase })));
 const AlertsPage = lazyWithRetry(() => import('./pages/farmer/AlertsPage').then(module => ({ default: module.AlertsPage })));
 const ProfilePage = lazyWithRetry(() => import('./pages/farmer/ProfilePage').then(module => ({ default: module.ProfilePage })));
@@ -62,8 +64,9 @@ function RootRedirect() {
 function App() {
   return (
     <BrowserRouter>
-      <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
+      <ToastProvider>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/" element={<RootRedirect />} />
@@ -198,6 +201,14 @@ function App() {
                 </ProtectedRoute>
               } />
               
+              <Route path="/disease-prediction" element={
+                <ProtectedRoute requiredRole="FARMER">
+                  <DashboardLayout>
+                    <DiseasePrediction />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              
               <Route path="/farmer/knowledge" element={
                 <ProtectedRoute requiredRole="FARMER">
                   <DashboardLayout>
@@ -221,8 +232,9 @@ function App() {
                   </DashboardLayout>
                 </ProtectedRoute>
               } />
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </ToastProvider>
     </BrowserRouter>
   );
 }
