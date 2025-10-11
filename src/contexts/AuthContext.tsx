@@ -163,16 +163,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         
         if (session?.user) {
-          // Ensure a corresponding profile row exists (id/email/role)
           try {
-            await supabase
+            // Check if user already exists in the users table
+            const { data: existingUser } = await supabase
               .from('users')
-              .upsert({
-                id: session.user.id,
-                email: session.user.email ?? '',
-                role: 'FARMER',
-                updated_at: new Date().toISOString(),
-              }, { onConflict: 'id' });
+              .select('role')
+              .eq('id', session.user.id)
+              .single();
+
+            // Only create a new user with default role if they don't exist
+            if (!existingUser) {
+              await supabase
+                .from('users')
+                .upsert({
+                  id: session.user.id,
+                  email: session.user.email ?? '',
+                  role: 'FARMER',  // Default role for new users
+                  updated_at: new Date().toISOString(),
+                }, { onConflict: 'id' });
+            }
           } catch (e) {
             console.error('Error ensuring profile exists:', e);
           }
