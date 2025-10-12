@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { History, Zap, Image, AlertCircle } from "lucide-react";
+import { History, Zap, Image, AlertCircle, ExternalLink } from "lucide-react";
 import { Button } from "../components/ui/button";
 import PredictionHistory from "../components/PredictionHistory";
+import { DiseasePredictionForm } from "../components/DiseasePredictionForm";
 
 export default function DiseasePredictionPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("predict");
+  const [useLocalAPI, setUseLocalAPI] = useState(true);
   const STREAMLIT_APP_URL = 'https://poultrydisease.streamlit.app/';
 
   useEffect(() => {
@@ -17,6 +19,11 @@ export default function DiseasePredictionPage() {
 
   const handleOpenPredictionTool = () => {
     window.open(STREAMLIT_APP_URL, '_blank', 'noopener,noreferrer');
+  };
+
+  const handlePredictionComplete = (result: any) => {
+    console.log('Prediction completed:', result);
+    // Optionally save to history or show notifications
   };
 
   return (
@@ -46,55 +53,84 @@ export default function DiseasePredictionPage() {
           </TabsList>
 
           <TabsContent value="predict" className="space-y-6">
-            <Card className="border border-gray-200 dark:border-gray-700">
-              <CardHeader className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
-                  <Image className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-                <CardTitle className="text-2xl">AI-Powered Poultry Health Check</CardTitle>
-                <CardDescription className="max-w-2xl mx-auto">
-                  Our advanced AI model analyzes images of your poultry to detect potential health issues early
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center justify-center p-8 pt-0 space-y-6">
-                <div className="space-y-4 text-center">
-                  <h3 className="text-lg font-medium">How it works:</h3>
-                  <ul className="grid gap-3 text-sm text-gray-600 dark:text-gray-300 text-left max-w-md mx-auto">
-                    <li className="flex items-start gap-2">
-                      <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400">1</span>
-                      <span>Click the button below to open the detection tool</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400">2</span>
-                      <span>Upload a clear photo of your poultry</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400">3</span>
-                      <span>Get instant analysis and recommendations</span>
-                    </li>
-                  </ul>
-                </div>
+            <div className="flex justify-center mb-6">
+              <div className="flex items-center gap-4 p-2 bg-gray-100 rounded-lg">
+                <button
+                  onClick={() => setUseLocalAPI(true)}
+                  className={`px-4 py-2 rounded-md transition-colors ${
+                    useLocalAPI 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-transparent text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Integrated Tool
+                </button>
+                <button
+                  onClick={() => setUseLocalAPI(false)}
+                  className={`px-4 py-2 rounded-md transition-colors ${
+                    !useLocalAPI 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-transparent text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  External Tool
+                </button>
+              </div>
+            </div>
 
-                <div className="pt-4 w-full max-w-xs">
-                  <Button 
-                    onClick={handleOpenPredictionTool}
-                    size="lg"
-                    className="w-full flex items-center justify-center gap-2 py-6 text-base"
-                  >
-                    <Zap className="h-5 w-5" />
-                    Open Disease Detection Tool
-                  </Button>
-                </div>
-
-                <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 p-4 text-amber-700 dark:border-amber-900 dark:bg-amber-900/30 dark:text-amber-400">
-                  <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium">Important Note</p>
-                    <p className="mt-1">The detection tool will open in a new tab. Please ensure your browser allows pop-ups for this site.</p>
+            {useLocalAPI ? (
+              <DiseasePredictionForm onPredictionComplete={handlePredictionComplete} />
+            ) : (
+              <Card className="border border-gray-200 dark:border-gray-700">
+                <CardHeader className="text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+                    <Image className="h-6 w-6 text-green-600 dark:text-green-400" />
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <CardTitle className="text-2xl">AI-Powered Poultry Health Check</CardTitle>
+                  <CardDescription className="max-w-2xl mx-auto">
+                    Our advanced AI model analyzes images of your poultry to detect potential health issues early
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center p-8 pt-0 space-y-6">
+                  <div className="space-y-4 text-center">
+                    <h3 className="text-lg font-medium">How it works:</h3>
+                    <ul className="grid gap-3 text-sm text-gray-600 dark:text-gray-300 text-left max-w-md mx-auto">
+                      <li className="flex items-start gap-2">
+                        <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400">1</span>
+                        <span>Click the button below to open the detection tool</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400">2</span>
+                        <span>Upload a clear photo of your poultry</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400">3</span>
+                        <span>Get instant analysis and recommendations</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="pt-4 w-full max-w-xs">
+                    <Button 
+                      onClick={handleOpenPredictionTool}
+                      size="lg"
+                      className="w-full flex items-center justify-center gap-2 py-6 text-base"
+                    >
+                      <ExternalLink className="h-5 w-5" />
+                      Open External Detection Tool
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 p-4 text-amber-700 dark:border-amber-900 dark:bg-amber-900/30 dark:text-amber-400">
+                    <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium">Important Note</p>
+                      <p className="mt-1">The detection tool will open in a new tab. Please ensure your browser allows pop-ups for this site.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="history">

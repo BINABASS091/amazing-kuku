@@ -7,6 +7,8 @@ import os
 from datetime import datetime
 from typing import Optional
 import requests
+import aiohttp
+import asyncio
 from pydantic import BaseModel
 
 app = FastAPI(title="Crop Disease Prediction API")
@@ -20,17 +22,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# This is a placeholder for your model loading function
-# Replace this with your actual model loading code
 class DiseasePredictor:
     def __init__(self):
-        # Initialize your model here
-        self.model = None
-        self.class_names = ["Healthy", "Diseased"]  # Update with your actual class names
+        # External API endpoint for poultry disease prediction
+        self.external_api_url = "https://apipoultrydisease.onrender.com/predict/"
         
-    def predict(self, image: Image.Image) -> dict:
+    async def predict(self, image: Image.Image) -> dict:
         """
-        Run prediction on an image
+        Run prediction on an image using external API
         
         Args:
             image: PIL Image object
@@ -38,45 +37,105 @@ class DiseasePredictor:
         Returns:
             dict: Prediction result with class and confidence
         """
-        # Preprocess the image (resize, normalize, etc.)
-        # This should match your model's expected input format
-        processed_img = self.preprocess_image(image)
-        
-        # Run prediction (replace with your model's prediction code)
-        # predictions = self.model.predict(processed_img)
-        
-        # For now, return a dummy prediction
-        # Replace this with actual model inference
-        import random
-        predicted_class = random.choice(self.class_names)
-        confidence = round(random.uniform(0.8, 0.99), 2)
-        
-        return {
-            "prediction": predicted_class,
-            "confidence": confidence,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    
-    def preprocess_image(self, image: Image.Image) -> np.ndarray:
-        """Preprocess the image for the model"""
-        # Resize to expected input size (update dimensions as needed)
-        image = image.resize((224, 224))
-        
-        # Convert to numpy array and normalize
-        img_array = np.array(image) / 255.0
-        
-        # Add batch dimension if needed
-        if len(img_array.shape) == 3:
-            img_array = np.expand_dims(img_array, axis=0)
+        try:
+            # Convert PIL image to bytes
+            img_buffer = io.BytesIO()
+            # Save as JPEG for compatibility
+            image.save(img_buffer, format='JPEG', quality=95)
+            img_buffer.seek(0)
             
-        return img_array
+            # Prepare multipart form data
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                form_data = aiohttp.FormData()
+                form_data.add_field('file', img_buffer.getvalue(), 
+                                  filename='image.jpg', 
+                                  content_type='image/jpeg')
+                
+                print(f"Sending request to external API: {self.external_api_url}")
+                
+                async with session.post(self.external_api_url, data=form_data) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        print(f"External API response: {result}")
+                        
+                        # Parse the response and normalize the format
+                        prediction = result.get("prediction", "Unknown")
+                        confidence_str = result.get("confidence", "0%")
+                        
+                        # Extract numeric confidence value
+                        confidence = float(confidence_str.replace("%", "")) / 100.0
+                        
+                        return {
+                            "prediction": prediction,
+                            "confidence": confidence,
+                            "confidence_percentage": confidence_str,
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "source": "external_api"
+                        }
+                    else:
+                        error_text = await response.text()
+                        print(f"External API error: {response.status} - {error_text}")
+                        raise HTTPException(
+                            status_code=502, 
+                            detail=f"External API error: {response.status}"
+                        )
+                        
+        except asyncio.TimeoutError:
+            print("External API timeout")
+            raise HTTPException(
+                status_code=504, 
+                detail="External API timeout - please try again"
+            )
+        except aiohttp.ClientError as e:
+            print(f"External API connection error: {e}")
+            raise HTTPException(
+                status_code=502, 
+                detail="Unable to connect to disease prediction service"
+            )
+        except Exception as e:
+            print(f"Unexpected error in disease prediction: {e}")
+            # Fallback to a simple response
+            return {
+                "prediction": "Unable to predict",
+                "confidence": 0.0,
+                "confidence_percentage": "0%",
+                "timestamp": datetime.utcnow().isoformat(),
+                "error": str(e),
+                "source": "fallback"
+            }
 
 # Initialize the predictor
 predictor = DiseasePredictor()
 
 @app.get("/")
 async def root():
-    return {"message": "Crop Disease Prediction API is running"}
+    return {
+        "message": "Amazing Kuku - Poultry Disease Prediction API is running",
+        "version": "1.0.0",
+        "status": "healthy",
+        "external_api": "https://apipoultrydisease.onrender.com"
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    try:
+        # Test connectivity to external API
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+            async with session.get("https://apipoultrydisease.onrender.com/docs") as response:
+                external_api_status = "healthy" if response.status == 200 else "unhealthy"
+    except:
+        external_api_status = "unhealthy"
+    
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "external_api_status": external_api_status,
+        "services": {
+            "image_processing": "healthy",
+            "disease_prediction": external_api_status
+        }
+    }
 
 @app.post("/predict")
 async def predict_disease(
@@ -99,20 +158,23 @@ async def predict_disease(
         image = Image.open(io.BytesIO(contents)).convert('RGB')
         print(f"Image loaded: {image.size[0]}x{image.size[1]} pixels")
         
-        # Make prediction
-        print("Making prediction...")
-        result = predictor.predict(image)
+        # Make prediction using external API
+        print("Making prediction using external API...")
+        result = await predictor.predict(image)
         print(f"Prediction result: {result}")
         
-        # Add crop type to result if provided
+        # Add additional metadata
+        result["filename"] = file.filename
+        result["image_size"] = f"{image.size[0]}x{image.size[1]}"
+        
         if crop_type:
             result["crop_type"] = crop_type
         
-        # Add filename to result
-        result["filename"] = file.filename
-        
         return result
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (they already have proper status codes)
+        raise
     except Exception as e:
         error_msg = f"Error processing image: {str(e)}"
         print(error_msg)
