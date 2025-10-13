@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { History, Zap, Image, AlertCircle, ExternalLink } from "lucide-react";
+import { History, Zap, Image, AlertCircle, ExternalLink, Play } from "lucide-react";
 import { Button } from "../components/ui/button";
 import PredictionHistory from "../components/PredictionHistory";
 import { DiseasePredictionForm } from "../components/DiseasePredictionForm";
+import { DiseasePredictionDemo } from "../components/DiseasePredictionDemo";
 
 export default function DiseasePredictionPage() {
   const { user } = useAuth();
@@ -41,14 +42,18 @@ export default function DiseasePredictionPage() {
           onValueChange={setActiveTab}
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-8">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto mb-8">
             <TabsTrigger value="predict" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               Detect Disease
             </TabsTrigger>
+            <TabsTrigger value="demo" className="flex items-center gap-2">
+              <Play className="h-4 w-4" />
+              Demo
+            </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
-              Prediction History
+              History
             </TabsTrigger>
           </TabsList>
 
@@ -131,6 +136,10 @@ export default function DiseasePredictionPage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="demo" className="space-y-6">
+            <DiseasePredictionDemo />
           </TabsContent>
 
           <TabsContent value="history">
