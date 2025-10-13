@@ -1,5 +1,14 @@
 // API service for disease prediction
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const getApiBaseUrl = () => {
+  // In production, use the environment variable or default to production backend
+  if (import.meta.env.PROD) {
+    return import.meta.env.VITE_API_BASE_URL || 'https://your-backend-app.railway.app';
+  }
+  // In development, use localhost
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface PredictionResult {
   prediction: string;

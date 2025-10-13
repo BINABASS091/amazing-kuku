@@ -1,0 +1,13 @@
+version: "3"
+
+services:
+  backend:
+    source: .
+    build:
+      commands:
+        - cd backend && pip install -r requirements.txt
+    start:
+      command: cd backend && python main.py
+    variables:
+      PORT: ${{ PORT }}
+      PYTHON_VERSION: 3.11.0

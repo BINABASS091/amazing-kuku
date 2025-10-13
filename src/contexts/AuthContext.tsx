@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   const fetchUserProfile = useCallback(async (userId: string, retries = 0): Promise<Profile | null> => {
     try {
@@ -126,26 +127,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Handle initial auth check
+  // Handle initial auth check with better persistence
   useEffect(() => {
     let isMounted = true;
 
     const getInitialSession = async () => {
       try {
+        // Check for cached session data first
+        const cachedProfile = localStorage.getItem('userProfile');
+        const cachedRole = localStorage.getItem('userRole');
+        
+        console.log('Auth: Initializing session check...');
+        
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (isMounted) {
+          console.log('Auth: Initial session:', !!initialSession);
           setSession(initialSession);
           
           if (initialSession?.user) {
-            await fetchAndSetProfile(initialSession.user.id);
+            console.log('Auth: Found session, fetching profile...');
+            
+            // Try to use cached profile if available during fetch
+            if (cachedProfile && cachedRole) {
+              try {
+                const parsedProfile = JSON.parse(cachedProfile);
+                console.log('Auth: Using cached profile temporarily');
+                setProfile({ ...parsedProfile, role: cachedRole as 'ADMIN' | 'FARMER' });
+                setUser({
+                  id: initialSession.user.id,
+                  email: parsedProfile.email || initialSession.user.email || '',
+                  role: cachedRole as 'ADMIN' | 'FARMER',
+                  user_metadata: {
+                    full_name: [parsedProfile.first_name, parsedProfile.last_name].filter(Boolean).join(' '),
+                  },
+                  app_metadata: { provider: 'email' }
+                } as AppUser);
+              } catch (e) {
+                console.warn('Auth: Failed to parse cached profile');
+              }
+            }
+            
+            // Always fetch fresh profile to ensure it's up to date
+            const freshProfile = await fetchAndSetProfile(initialSession.user.id);
+            if (freshProfile) {
+              // Cache the fresh profile
+              localStorage.setItem('userProfile', JSON.stringify(freshProfile));
+              localStorage.setItem('userRole', freshProfile.role);
+              console.log('Auth: Profile refreshed and cached');
+            }
           } else {
+            console.log('Auth: No session found, clearing state');
             setUser(null);
             setProfile(null);
+            // Clear cached data
+            localStorage.removeItem('userProfile');
+            localStorage.removeItem('userRole');
           }
+          
+          setInitialized(true);
         }
       } catch (error) {
-        console.error('Error getting initial session:', error);
+        console.error('Auth: Error getting initial session:', error);
+        if (isMounted) {
+          // Clear potentially corrupted cache
+          localStorage.removeItem('userProfile');
+          localStorage.removeItem('userRole');
+          setInitialized(true);
+        }
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -157,12 +206,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         if (!isMounted) return;
+        
+        console.log('Auth: State change event:', event, !!session);
+        
+        // Don't process INITIAL_SESSION event if we're already initialized
+        if (event === 'INITIAL_SESSION' && initialized) {
+          console.log('Auth: Skipping initial session - already initialized');
+          return;
+        }
         
         setSession(session);
         
         if (session?.user) {
+          console.log('Auth: Session active, processing user...');
           try {
             // Check if user already exists in the users table
             const { data: existingUser } = await supabase
@@ -173,6 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             // Only create a new user with default role if they don't exist
             if (!existingUser) {
+              console.log('Auth: Creating new user profile...');
               await supabase
                 .from('users')
                 .upsert({
@@ -183,12 +242,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }, { onConflict: 'id' });
             }
           } catch (e) {
-            console.error('Error ensuring profile exists:', e);
+            console.error('Auth: Error ensuring profile exists:', e);
           }
-          await fetchAndSetProfile(session.user.id);
+          
+          const profile = await fetchAndSetProfile(session.user.id);
+          if (profile) {
+            // Cache the profile for persistence
+            localStorage.setItem('userProfile', JSON.stringify(profile));
+            localStorage.setItem('userRole', profile.role);
+          }
         } else {
+          console.log('Auth: No session, clearing state...');
           setUser(null);
           setProfile(null);
+          // Clear cached data on sign out
+          localStorage.removeItem('userProfile');
+          localStorage.removeItem('userRole');
         }
       }
     );
@@ -323,7 +392,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signInWithProvider: async (provider: 'google') => {
       try {
         setLoading(true);
-        const { data, error } = await supabase.auth.signInWithOAuth({
+        const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
             redirectTo: window.location.origin,
