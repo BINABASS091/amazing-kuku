@@ -12,7 +12,8 @@ import {
   Bell,
   Lightbulb,
   Bird,
-  Activity
+  Activity,
+  Crown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -48,6 +49,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: '/disease-prediction', icon: Activity, label: 'Disease Prediction' },
     { to: '/farmer/knowledge', icon: Lightbulb, label: t('sidebar.knowledgeBase') },
     { to: '/farmer/alerts', icon: Bell, label: t('sidebar.alerts') },
+    { to: '/farmer/subscription', icon: Crown, label: 'Subscription' },
     { to: '/farmer/profile', icon: Settings, label: t('common.profile') },
   ];
 

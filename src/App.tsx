@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { ToastProvider } from './components/ui/toast';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
+import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardLayout } from './components/DashboardLayout';
 
@@ -44,6 +45,7 @@ const DiseasePrediction = lazyWithRetry(() => import('./pages/disease-prediction
 const KnowledgeBase = lazyWithRetry(() => import('./pages/farmer/KnowledgeBase').then(module => ({ default: module.KnowledgeBase })));
 const AlertsPage = lazyWithRetry(() => import('./pages/farmer/AlertsPage').then(module => ({ default: module.AlertsPage })));
 const ProfilePage = lazyWithRetry(() => import('./pages/farmer/ProfilePage').then(module => ({ default: module.ProfilePage })));
+const Subscription = lazyWithRetry(() => import('./pages/farmer/Subscription').then(module => ({ default: module.default })));
 
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -65,7 +67,8 @@ function App() {
   return (
     <BrowserRouter>
       <ToastProvider>
-        <Suspense fallback={<LoadingSpinner />}>
+        <SubscriptionProvider>
+          <Suspense fallback={<LoadingSpinner />}>
           <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
@@ -232,8 +235,17 @@ function App() {
                   </DashboardLayout>
                 </ProtectedRoute>
               } />
+              
+              <Route path="/farmer/subscription" element={
+                <ProtectedRoute requiredRole="FARMER">
+                  <DashboardLayout>
+                    <Subscription />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
           </Routes>
         </Suspense>
+        </SubscriptionProvider>
       </ToastProvider>
     </BrowserRouter>
   );

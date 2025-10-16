@@ -1,30 +1,72 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useSubscription } from "../contexts/SubscriptionContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { History, Zap, Image, AlertCircle, ExternalLink, Play } from "lucide-react";
+import { History, Zap, Image, AlertCircle, ExternalLink, Play, Crown } from "lucide-react";
 import { Button } from "../components/ui/button";
 import PredictionHistory from "../components/PredictionHistory";
 import { DiseasePredictionForm } from "../components/DiseasePredictionForm";
 import { DiseasePredictionDemo } from "../components/DiseasePredictionDemo";
+import { supabase } from "../lib/supabase";
 
 export default function DiseasePredictionPage() {
   const { user } = useAuth();
+  const { checkLimit, planLimits, getUpgradeMessage } = useSubscription();
   const [activeTab, setActiveTab] = useState("predict");
   const [useLocalAPI, setUseLocalAPI] = useState(true);
+  const [monthlyPredictions, setMonthlyPredictions] = useState(0);
+  const [isCheckingLimit, setIsCheckingLimit] = useState(false);
   const STREAMLIT_APP_URL = 'https://poultrydisease.streamlit.app/';
 
   useEffect(() => {
     document.title = "Disease Prediction | Smart Kuku";
-  }, []);
+    fetchMonthlyPredictions();
+  }, [user]);
+
+  const fetchMonthlyPredictions = async () => {
+    if (!user) return;
+
+    try {
+      const { data: farmer } = await supabase
+        .from('farmers')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!farmer) return;
+
+      const currentMonth = new Date();
+      const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      
+      const { count } = await supabase
+        .from('disease_predictions')
+        .select('*', { count: 'exact', head: true })
+        .eq('farmer_id', farmer.id)
+        .gte('created_at', firstDayOfMonth.toISOString());
+
+      setMonthlyPredictions(count || 0);
+    } catch (error) {
+      console.error('Error fetching monthly predictions:', error);
+    }
+  };
+
+  const canMakePrediction = () => {
+    return checkLimit('maxPredictions', monthlyPredictions);
+  };
 
   const handleOpenPredictionTool = () => {
+    if (!canMakePrediction()) {
+      alert(getUpgradeMessage('disease predictions'));
+      return;
+    }
     window.open(STREAMLIT_APP_URL, '_blank', 'noopener,noreferrer');
   };
 
   const handlePredictionComplete = (result: any) => {
     console.log('Prediction completed:', result);
-    // Optionally save to history or show notifications
+    // Refresh the monthly predictions count
+    fetchMonthlyPredictions();
   };
 
   return (
@@ -58,6 +100,36 @@ export default function DiseasePredictionPage() {
           </TabsList>
 
           <TabsContent value="predict" className="space-y-6">
+            {/* Usage Counter */}
+            <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Crown className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Disease Predictions</h3>
+                      <p className="text-sm text-gray-600">
+                        Used {monthlyPredictions} this month
+                        {planLimits.maxPredictions !== -1 && ` of ${planLimits.maxPredictions}`}
+                      </p>
+                    </div>
+                  </div>
+                  {!canMakePrediction() && (
+                    <Button 
+                      onClick={() => window.location.href = '/farmer/subscription'}
+                      variant="outline"
+                      size="sm"
+                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                    >
+                      Upgrade Plan
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="flex justify-center mb-6">
               <div className="flex items-center gap-4 p-2 bg-gray-100 rounded-lg">
                 <button

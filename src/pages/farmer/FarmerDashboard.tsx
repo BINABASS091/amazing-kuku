@@ -4,7 +4,8 @@ import { supabase, Alert } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { StatCard } from '../../components/StatCard';
-import { Warehouse, Package, AlertTriangle, Activity, TrendingUp, Radio, Calendar, Plus } from 'lucide-react';
+import SubscriptionSummary from '../../components/SubscriptionSummary';
+import { Warehouse, Package, AlertTriangle, Activity, TrendingUp, Radio } from 'lucide-react';
 
 export function FarmerDashboard() {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ export function FarmerDashboard() {
     unreadAlerts: 0,
     criticalAlerts: 0,
     pendingActivities: 0,
+    monthlyPredictions: 0,
   });
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [recentBatches, setRecentBatches] = useState<any[]>([]);
@@ -101,6 +103,16 @@ export function FarmerDashboard() {
           .limit(3) : Promise.resolve({ data: [] }),
       ]);
 
+      // Get current month's predictions count
+      const currentMonth = new Date();
+      const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      
+      const { count: predictionsCount } = await supabase
+        .from('disease_predictions')
+        .select('*', { count: 'exact', head: true })
+        .eq('farmer_id', farmer.id)
+        .gte('created_at', firstDayOfMonth.toISOString());
+
       setStats({
         totalFarms: (farmsData || []).length,
         activeFarms: activeFarmsCount,
@@ -112,6 +124,7 @@ export function FarmerDashboard() {
         unreadAlerts: alertsCount.count || 0,
         criticalAlerts: criticalAlertsCount.count || 0,
         pendingActivities: activitiesCount.count || 0,
+        monthlyPredictions: predictionsCount || 0,
       });
 
       setRecentAlerts(alertsData.data || []);
@@ -239,39 +252,11 @@ export function FarmerDashboard() {
           )}
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">{t('dashboard.quickActions')}</h2>
-          <div className="space-y-3">
-            <Link
-              to="/farmer/farms"
-              className="flex items-center gap-3 w-full px-4 py-3 bg-green-50 text-green-700 rounded-lg font-medium hover:bg-green-100 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              {t('dashboard.addNewFarm')}
-            </Link>
-            <Link
-              to="/farmer/batches"
-              className="flex items-center gap-3 w-full px-4 py-3 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              {t('dashboard.addNewBatch')}
-            </Link>
-            <Link
-              to="/farmer/activities"
-              className="flex items-center gap-3 w-full px-4 py-3 bg-orange-50 text-orange-700 rounded-lg font-medium hover:bg-orange-100 transition-colors"
-            >
-              <Calendar className="w-5 h-5" />
-              {t('dashboard.viewActivities')}
-            </Link>
-            <Link
-              to="/farmer/knowledge"
-              className="flex items-center gap-3 w-full px-4 py-3 bg-purple-50 text-purple-700 rounded-lg font-medium hover:bg-purple-100 transition-colors"
-            >
-              <Activity className="w-5 h-5" />
-              {t('dashboard.browseTips')}
-            </Link>
-          </div>
-        </div>
+        <SubscriptionSummary
+          totalBirds={stats.totalBirds}
+          totalBatches={stats.activeBatches}
+          monthlyPredictions={stats.monthlyPredictions}
+        />
       </div>
 
       {recentAlerts.length > 0 && (
