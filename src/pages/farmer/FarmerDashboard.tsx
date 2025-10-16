@@ -107,11 +107,29 @@ export function FarmerDashboard() {
       const currentMonth = new Date();
       const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       
-      const { count: predictionsCount } = await supabase
-        .from('disease_predictions')
-        .select('*', { count: 'exact', head: true })
-        .eq('farmer_id', farmer.id)
-        .gte('created_at', firstDayOfMonth.toISOString());
+      let predictionsCount = 0;
+      try {
+        const { count, error } = await supabase
+          .from('disease_predictions')
+          .select('*', { count: 'exact', head: true })
+          .eq('farmer_id', farmer.id)
+          .gte('created_at', firstDayOfMonth.toISOString());
+
+        if (error) {
+          // Handle case where table doesn't exist (like 404 error)
+          if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
+            console.log('Disease predictions table not found, using 0 count');
+            predictionsCount = 0;
+          } else {
+            throw error;
+          }
+        } else {
+          predictionsCount = count || 0;
+        }
+      } catch (error) {
+        console.error('Error fetching predictions count:', error);
+        predictionsCount = 0;
+      }
 
       setStats({
         totalFarms: (farmsData || []).length,
@@ -124,7 +142,7 @@ export function FarmerDashboard() {
         unreadAlerts: alertsCount.count || 0,
         criticalAlerts: criticalAlertsCount.count || 0,
         pendingActivities: activitiesCount.count || 0,
-        monthlyPredictions: predictionsCount || 0,
+        monthlyPredictions: predictionsCount,
       });
 
       setRecentAlerts(alertsData.data || []);

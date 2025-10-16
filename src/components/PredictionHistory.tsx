@@ -32,7 +32,15 @@ export default function PredictionHistory() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // Handle case where table doesn't exist (like 404 error)
+        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
+          console.log('Disease predictions table not found, showing empty history');
+          setPredictions([]);
+          return;
+        }
+        throw error;
+      }
       setPredictions(data || []);
     } catch (error) {
       console.error("Error fetching predictions:", error);
@@ -41,6 +49,7 @@ export default function PredictionHistory() {
         description: "Failed to load prediction history",
         variant: "destructive",
       });
+      setPredictions([]);
     } finally {
       setLoading(false);
     }

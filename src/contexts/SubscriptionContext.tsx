@@ -17,8 +17,10 @@ interface PlanLimits {
   maxBirds: number;
   maxPredictions: number;
   maxBatches: number;
+  maxInventoryItems: number;
   hasFinancialTracking: boolean;
   hasAdvancedAnalytics: boolean;
+  hasInventoryManagement: boolean;
   hasMultiFarmManagement: boolean;
   hasApiAccess: boolean;
   hasPrioritySupport: boolean;
@@ -42,8 +44,10 @@ const PLAN_LIMITS: Record<string, PlanLimits> = {
     maxBirds: 10,
     maxPredictions: 5,
     maxBatches: 1,
+    maxInventoryItems: 0,
     hasFinancialTracking: false,
     hasAdvancedAnalytics: false,
+    hasInventoryManagement: false,
     hasMultiFarmManagement: false,
     hasApiAccess: false,
     hasPrioritySupport: false,
@@ -52,8 +56,10 @@ const PLAN_LIMITS: Record<string, PlanLimits> = {
     maxBirds: 100,
     maxPredictions: 50,
     maxBatches: 5,
+    maxInventoryItems: 50,
     hasFinancialTracking: false,
     hasAdvancedAnalytics: false,
+    hasInventoryManagement: true,
     hasMultiFarmManagement: false,
     hasApiAccess: false,
     hasPrioritySupport: false,
@@ -62,8 +68,10 @@ const PLAN_LIMITS: Record<string, PlanLimits> = {
     maxBirds: 500,
     maxPredictions: -1, // unlimited
     maxBatches: 20,
+    maxInventoryItems: 200,
     hasFinancialTracking: true,
     hasAdvancedAnalytics: true,
+    hasInventoryManagement: true,
     hasMultiFarmManagement: false,
     hasApiAccess: false,
     hasPrioritySupport: true,
@@ -72,8 +80,10 @@ const PLAN_LIMITS: Record<string, PlanLimits> = {
     maxBirds: -1, // unlimited
     maxPredictions: -1, // unlimited
     maxBatches: -1, // unlimited
+    maxInventoryItems: -1, // unlimited
     hasFinancialTracking: true,
     hasAdvancedAnalytics: true,
+    hasInventoryManagement: true,
     hasMultiFarmManagement: true,
     hasApiAccess: true,
     hasPrioritySupport: true,

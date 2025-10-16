@@ -39,15 +39,27 @@ export default function DiseasePredictionPage() {
       const currentMonth = new Date();
       const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from('disease_predictions')
         .select('*', { count: 'exact', head: true })
         .eq('farmer_id', farmer.id)
         .gte('created_at', firstDayOfMonth.toISOString());
 
+      if (error) {
+        // Handle case where table doesn't exist (like 404 error)
+        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
+          console.log('Disease predictions table not found, setting count to 0');
+          setMonthlyPredictions(0);
+          return;
+        }
+        throw error;
+      }
+
       setMonthlyPredictions(count || 0);
     } catch (error) {
       console.error('Error fetching monthly predictions:', error);
+      // Fallback to 0 predictions if there's any error
+      setMonthlyPredictions(0);
     }
   };
 
