@@ -81,7 +81,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-gray-200">
-            <h1 className="text-2xl font-bold text-green-600">Fugaji Pro</h1>
+            <h1 className="text-2xl font-bold text-green-600">Amazing Kuku</h1>
             <p className="text-sm text-gray-600 mt-1">
               {user?.role === 'ADMIN' ? t('sidebar.adminPortal') : t('sidebar.farmerPortal')}
             </p>
