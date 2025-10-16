@@ -6,7 +6,7 @@ import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardLayout } from './components/DashboardLayout';
 
-// Lazy load pages with proper named export handling
+// Lazy load pages with proper named export handling for React components
 const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
 const Signup = lazy(() => import('./pages/Signup').then(module => ({ default: module.Signup })));
 
