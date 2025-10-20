@@ -1,90 +1,156 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, Search } from 'lucide-react';
+import { DollarSign, Search, RefreshCw, Users, Crown } from 'lucide-react';
 
-interface Subscription {
-  id: string;
+interface FarmerSubscription {
   farmer_id: string;
-  plan_type: string;
-  status: string;
-  start_date: string;
-  end_date: string | null;
-  amount: number;
-  created_at: string;
-  farmer: {
-    user: {
-      full_name: string;
-      email: string;
-    };
-  };
+  farmer_name: string;
+  farmer_email: string;
+  current_plan: string;
+  current_status: string;
+  subscription_start: string | null;
+  subscription_end: string | null;
+  amount_paid: number;
+  last_updated: string;
+  has_active_subscription: boolean;
 }
 
 export function SubscriptionsManagement() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [farmerSubscriptions, setFarmerSubscriptions] = useState<FarmerSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [planFilter, setPlanFilter] = useState<string>('ALL');
 
   useEffect(() => {
-    fetchSubscriptions();
+    fetchAllFarmerSubscriptions();
+    
+    // Set up real-time subscription for subscription changes
+    const subscriptionChannel = supabase
+      .channel('subscription_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'subscriptions' },
+        () => {
+          console.log('Subscription changed, refreshing data...');
+          fetchAllFarmerSubscriptions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscriptionChannel);
+    };
   }, []);
 
-  const fetchSubscriptions = async () => {
+  const fetchAllFarmerSubscriptions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('subscriptions')
+      setLoading(true);
+      
+      // First, get all farmers
+      const { data: farmers, error: farmersError } = await supabase
+        .from('farmers')
         .select(`
-          *,
-          farmer:farmers(
-            user:users(full_name, email)
-          )
+          id,
+          user:users(full_name, email, created_at)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setSubscriptions((data as any) || []);
+      if (farmersError) throw farmersError;
+
+      // Then get all subscriptions
+      const { data: subscriptions, error: subscriptionsError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (subscriptionsError) throw subscriptionsError;
+
+      // Combine data to show all farmers with their subscription status
+      const farmerSubscriptionData: FarmerSubscription[] = farmers?.map(farmer => {
+        // Find the most recent subscription for this farmer
+        const farmerSubs = subscriptions?.filter(sub => sub.farmer_id === farmer.id) || [];
+        const latestSub = farmerSubs.length > 0 ? farmerSubs[0] : null;
+        
+        // Determine current plan and status
+        let currentPlan = 'FREE';
+        let currentStatus = 'ACTIVE';
+        let hasActiveSubscription = false;
+        
+        if (latestSub) {
+          // Check if subscription is currently active
+          const now = new Date();
+          const endDate = latestSub.end_date ? new Date(latestSub.end_date) : null;
+          
+          if (latestSub.status === 'ACTIVE' && (!endDate || endDate > now)) {
+            currentPlan = latestSub.plan_type;
+            currentStatus = 'ACTIVE';
+            hasActiveSubscription = true;
+          } else if (latestSub.status === 'EXPIRED' || (endDate && endDate <= now)) {
+            currentPlan = 'FREE'; // Reverted to FREE if expired
+            currentStatus = 'EXPIRED';
+          } else {
+            currentPlan = latestSub.plan_type;
+            currentStatus = latestSub.status;
+            hasActiveSubscription = latestSub.status === 'ACTIVE';
+          }
+        }
+
+        return {
+          farmer_id: farmer.id,
+          farmer_name: farmer.user?.full_name || 'Unknown',
+          farmer_email: farmer.user?.email || 'Unknown',
+          current_plan: currentPlan,
+          current_status: currentStatus,
+          subscription_start: latestSub?.start_date || null,
+          subscription_end: latestSub?.end_date || null,
+          amount_paid: latestSub?.amount || 0,
+          last_updated: latestSub?.updated_at || farmer.user?.created_at || new Date().toISOString(),
+          has_active_subscription: hasActiveSubscription
+        };
+      }) || [];
+
+      setFarmerSubscriptions(farmerSubscriptionData);
     } catch (error) {
-      console.error('Error fetching subscriptions:', error);
+      console.error('Error fetching farmer subscriptions:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredSubscriptions = subscriptions.filter((sub) => {
+  const filteredSubscriptions = farmerSubscriptions.filter((farmer) => {
     const matchesSearch =
-      sub.farmer.user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sub.farmer.user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || sub.status === statusFilter;
-    const matchesPlan = planFilter === 'ALL' || sub.plan_type === planFilter;
+      farmer.farmer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      farmer.farmer_email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'ALL' || farmer.current_status === statusFilter;
+    const matchesPlan = planFilter === 'ALL' || farmer.current_plan === planFilter;
     return matchesSearch && matchesStatus && matchesPlan;
   });
 
   const getPlanBadgeColor = (plan: string) => {
     switch (plan) {
       case 'FREE':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border border-gray-300';
       case 'BASIC':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 border border-blue-300';
       case 'PREMIUM':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border border-green-300';
       case 'ENTERPRISE':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-100 text-purple-800 border border-purple-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border border-gray-300';
     }
   };
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'ACTIVE':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border border-green-300';
       case 'EXPIRED':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border border-red-300';
       case 'CANCELLED':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border border-gray-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border border-gray-300';
     }
   };
 
@@ -106,50 +172,71 @@ export function SubscriptionsManagement() {
   }
 
   const stats = {
-    total: subscriptions.length,
-    active: subscriptions.filter((s) => s.status === 'ACTIVE').length,
-    expired: subscriptions.filter((s) => s.status === 'EXPIRED').length,
-    totalRevenue: subscriptions.reduce((sum, s) => sum + (s.amount || 0), 0),
+    totalFarmers: farmerSubscriptions.length,
+    freePlan: farmerSubscriptions.filter((f) => f.current_plan === 'FREE').length,
+    paidPlans: farmerSubscriptions.filter((f) => f.current_plan !== 'FREE').length,
+    activeSubscriptions: farmerSubscriptions.filter((f) => f.has_active_subscription).length,
+    totalRevenue: farmerSubscriptions.reduce((sum, f) => sum + (f.amount_paid || 0), 0),
   };
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Subscription Management</h1>
-        <p className="text-gray-600 mt-2">Monitor and manage farmer subscriptions</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">All Farmer Subscriptions</h1>
+          <p className="text-gray-600 mt-2">Monitor all farmers and their subscription status (including FREE plans)</p>
+        </div>
+        <button
+          onClick={fetchAllFarmerSubscriptions}
+          disabled={loading}
+          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Subscriptions</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">{stats.total}</p>
+              <p className="text-sm text-gray-600">Total Farmers</p>
+              <p className="text-2xl font-bold text-gray-900 mt-2">{stats.totalFarmers}</p>
             </div>
-            <DollarSign className="w-10 h-10 text-blue-500" />
+            <Users className="w-10 h-10 text-blue-500" />
           </div>
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Active</p>
-              <p className="text-2xl font-bold text-green-600 mt-2">{stats.active}</p>
+              <p className="text-sm text-gray-600">Free Plan</p>
+              <p className="text-2xl font-bold text-gray-600 mt-2">{stats.freePlan}</p>
+            </div>
+            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+              <Users className="w-6 h-6 text-gray-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Paid Plans</p>
+              <p className="text-2xl font-bold text-green-600 mt-2">{stats.paidPlans}</p>
+            </div>
+            <Crown className="w-10 h-10 text-green-500" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Active Subs</p>
+              <p className="text-2xl font-bold text-green-600 mt-2">{stats.activeSubscriptions}</p>
             </div>
             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Expired</p>
-              <p className="text-2xl font-bold text-red-600 mt-2">{stats.expired}</p>
-            </div>
-            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-red-600" />
             </div>
           </div>
         </div>
@@ -208,27 +295,35 @@ export function SubscriptionsManagement() {
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <h3 className="text-lg font-medium text-gray-900">
+            All Farmers & Subscription Status ({filteredSubscriptions.length} of {farmerSubscriptions.length})
+          </h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Real-time view of all farmers including those on FREE plans
+          </p>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Farmer
+                  Farmer Details
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Plan
+                  Current Plan
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
+                  Amount Paid
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Start Date
+                  Subscription Period
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  End Date
+                  Last Updated
                 </th>
               </tr>
             </thead>
@@ -236,48 +331,72 @@ export function SubscriptionsManagement() {
               {filteredSubscriptions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    No subscriptions found
+                    No farmers found matching the current filters
                   </td>
                 </tr>
               ) : (
-                filteredSubscriptions.map((subscription) => (
-                  <tr key={subscription.id} className="hover:bg-gray-50">
+                filteredSubscriptions.map((farmer) => (
+                  <tr key={farmer.farmer_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {subscription.farmer.user.full_name}
+                          {farmer.farmer_name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {subscription.farmer.user.email}
+                          {farmer.farmer_email}
                         </div>
+                        {farmer.has_active_subscription && (
+                          <div className="flex items-center mt-1">
+                            <Crown className="w-3 h-3 text-yellow-500 mr-1" />
+                            <span className="text-xs text-yellow-600">Premium User</span>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPlanBadgeColor(
-                          subscription.plan_type
+                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPlanBadgeColor(
+                          farmer.current_plan
                         )}`}
                       >
-                        {subscription.plan_type}
+                        {farmer.current_plan}
+                        {farmer.current_plan === 'FREE' && (
+                          <span className="ml-1 text-gray-500">(Default)</span>
+                        )}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(
-                          subscription.status
+                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(
+                          farmer.current_status
                         )}`}
                       >
-                        {subscription.status}
+                        {farmer.current_status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${subscription.amount.toLocaleString()}
+                      {farmer.amount_paid > 0 ? (
+                        <span className="font-medium text-green-600">
+                          ${farmer.amount_paid.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">$0 (FREE)</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(subscription.start_date)}
+                      {farmer.subscription_start ? (
+                        <div>
+                          <div>{formatDate(farmer.subscription_start)}</div>
+                          <div className="text-xs text-gray-500">
+                            to {formatDate(farmer.subscription_end)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">No subscription</span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(subscription.end_date)}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(farmer.last_updated)}
                     </td>
                   </tr>
                 ))
