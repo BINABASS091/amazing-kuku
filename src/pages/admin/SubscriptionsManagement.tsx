@@ -51,7 +51,8 @@ export function SubscriptionsManagement() {
         .from('farmers')
         .select(`
           id,
-          user:users(full_name, email, created_at)
+          created_at,
+          user:users!inner(full_name, email, created_at)
         `)
         .order('created_at', { ascending: false });
 
@@ -95,16 +96,19 @@ export function SubscriptionsManagement() {
           }
         }
 
+        // Handle user data (it might be an array from the relation)
+        const userData = Array.isArray(farmer.user) ? farmer.user[0] : farmer.user;
+
         return {
           farmer_id: farmer.id,
-          farmer_name: farmer.user?.full_name || 'Unknown',
-          farmer_email: farmer.user?.email || 'Unknown',
+          farmer_name: userData?.full_name || 'Unknown',
+          farmer_email: userData?.email || 'Unknown',
           current_plan: currentPlan,
           current_status: currentStatus,
           subscription_start: latestSub?.start_date || null,
           subscription_end: latestSub?.end_date || null,
           amount_paid: latestSub?.amount || 0,
-          last_updated: latestSub?.updated_at || farmer.user?.created_at || new Date().toISOString(),
+          last_updated: latestSub?.updated_at || userData?.created_at || new Date().toISOString(),
           has_active_subscription: hasActiveSubscription
         };
       }) || [];
