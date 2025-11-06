@@ -8,7 +8,7 @@ import SubscriptionSummary from '../../components/SubscriptionSummary';
 import { Warehouse, Package, AlertTriangle, Activity, TrendingUp, Radio } from 'lucide-react';
 
 export function FarmerDashboard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useLanguage();
   const [stats, setStats] = useState({
     totalFarms: 0,
@@ -165,7 +165,7 @@ export function FarmerDashboard() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">{t('dashboard.welcome')}, {user?.full_name}!</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t('dashboard.welcome')}, {user?.user_metadata?.full_name || profile?.first_name || user?.email?.split('@')[0] || 'Farmer'}!</h1>
         <p className="text-gray-600 mt-2">{t('dashboard.welcomeMessage')}</p>
       </div>
 

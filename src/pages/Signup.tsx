@@ -28,7 +28,7 @@ export function Signup() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const { signUp, signInWithProvider } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,8 +187,8 @@ export function Signup() {
   const handleGoogle = async () => {
     setError('');
     setLoading(true);
-    const { error } = await signInWithProvider('google');
-    if (error) setError(error.message);
+    // TODO: Implement Google sign-in with Supabase
+    setError('Google sign-in not yet implemented');
     setLoading(false);
   };
 

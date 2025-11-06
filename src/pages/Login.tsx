@@ -11,7 +11,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signInWithProvider, resendVerification, user, session } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
 
   const normalizeRole = (value: any): 'ADMIN' | 'FARMER' => {
@@ -22,14 +22,14 @@ export function Login() {
   // Handle redirect after successful authentication
   useEffect(() => {
     console.log('Auth state updated:', { 
-      hasSession: !!session, 
+      hasUser: !!user, 
       user,
       loading,
       currentPath: window.location.pathname
     });
 
     const checkAuthAndRedirect = async () => {
-      if (!session || loading) return;
+      if (!user || loading) return;
       
       console.log('Checking auth and redirecting...');
       
@@ -37,13 +37,13 @@ export function Login() {
       let role = normalizeRole(user?.role || localStorage.getItem('userRole') || '');
       
       // If still no role, try to fetch it from the database
-      if (!role && session.user?.id) {
+      if (!role && user?.id) {
         console.log('No role found, fetching from database...');
         try {
           const { data: profile, error } = await supabase
             .from('users')
             .select('role')
-            .eq('id', session.user.id)
+            .eq('id', user.id)
             .single();
             
           if (!error && profile?.role) {
@@ -60,7 +60,7 @@ export function Login() {
       const finalRole = normalizeRole(role || 'FARMER');
       
       console.log('Auth check complete:', { 
-        hasSession: !!session, 
+        hasUser: !!user, 
         finalRole,
         currentPath: window.location.pathname
       });
@@ -74,7 +74,7 @@ export function Login() {
     };
     
     checkAuthAndRedirect();
-  }, [session, user, loading, navigate]);
+  }, [user, loading, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -124,15 +124,15 @@ export function Login() {
   const handleGoogle = async () => {
     setError('');
     setLoading(true);
-    const { error } = await signInWithProvider('google');
-    if (error) setError(error.message);
+    // TODO: Implement Google sign-in with Supabase
+    setError('Google sign-in not yet implemented');
     setLoading(false);
   };
 
   const handleResend = async () => {
     if (!email) return;
-    const { error } = await resendVerification(email);
-    if (error) setError(error.message);
+    // TODO: Implement resend verification with Supabase
+    setError('Resend verification not yet implemented');
   };
 
   return (

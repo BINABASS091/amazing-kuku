@@ -1,21 +1,70 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
-import numpy as np
-import io
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
 import os
-from datetime import datetime
-from typing import Optional
-import requests
-import aiohttp
-import asyncio
-from pydantic import BaseModel
+import uuid
+from dotenv import load_dotenv
+from PIL import Image  # Add this import for image processing
+
+# Load environment variables
+load_dotenv()
+
+# Import database and models
+from database import engine, Base, get_db
+from api.models import User, Farm  # Import our SQLAlchemy models
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+# Import API routes
+import api.auth_endpoints as auth_endpoints
+import api.users as users
+import api.farms as farms
+from api.schemas import UserInDB
+from api.auth import get_current_active_user
 
 app = FastAPI(
-    title="Crop Disease Prediction API",
-    description="Amazing Kuku - Poultry Disease Prediction API",
-    version="1.0.0"
+    title="Amazing Kuku API",
+    description="Poultry Farm Management System API",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
+
+# CORS middleware configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],
+)
+
+# Include API routers
+app.include_router(auth_endpoints.router, prefix="/api/auth", tags=["authentication"])
+app.include_router(users.router, prefix="/api", tags=["users"])
+app.include_router(farms.router, prefix="/api", tags=["farms"])
+
+# Health check endpoint
+@app.get("/api/health", tags=["health"])
+async def health_check():
+    return {"status": "healthy", "version": "1.0.0"}
+
+# Protected route example
+@app.get("/api/protected-route", tags=["examples"])
+async def protected_route(current_user: UserInDB = Depends(get_current_active_user)):
+    return {
+        "message": "This is a protected route",
+        "user": current_user.email,
+        "role": current_user.role
+    }
+
+# Run the application
+if __name__ == "__main__":
+    uvicorn.run("api.index:app", host="0.0.0.0", port=8000, reload=True)
 
 # Enable CORS
 app.add_middleware(

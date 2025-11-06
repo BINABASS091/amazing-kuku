@@ -1,0 +1,31 @@
+# FastAPI Core
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+
+# Image Processing & AI
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# HTTP Clients
+aiohttp>=3.9.0
+requests>=2.31.0
+
+# Data Validation
+pydantic>=2.5.0
+
+# File Upload
+python-multipart>=0.0.6
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# CORS Support
+fastapi-cors>=0.0.6
+
+# Optional: Database support (if needed)
+# sqlalchemy>=2.0.0
+# databases[postgresql]>=0.8.0
+
+# Development
+pytest>=7.4.0
+pytest-asyncio>=0.21.0

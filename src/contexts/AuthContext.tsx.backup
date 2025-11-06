@@ -1,0 +1,578 @@
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+
+interface User {
+  id: string;
+  email: string;
+  role: 'ADMIN' | 'FARMER';
+  user_metadata?: {
+    full_name?: string;
+    avatar_url?: string;
+  };
+}
+
+interface Profile {
+  id: string;
+  email: string;
+  role: 'ADMIN' | 'FARMER';
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  created_at?: string;
+  updated_at?: string;
+  farmer_details?: {
+    businessName?: string;
+    location?: string;
+    phoneNumber?: string;
+    experienceYears?: number;
+  } | null;
+}
+
+interface AuthContextType {
+  user: User | null;
+  profile: Profile | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<{ error: Error | null }>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const API_URL = 'http://localhost:8000/api';
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('authToken');
+        
+        if (!token) {
+          setUser(null);
+          setProfile(null);
+          return;
+        }
+
+        // Verify token and get user data
+        const response = await fetch(`${API_URL}/users/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Token is invalid or expired
+            localStorage.removeItem('authToken');
+            setUser(null);
+            setProfile(null);
+          }
+          throw new Error('Session expired or invalid');
+        }
+
+        const userData = await response.json();
+        
+        // Update user state
+        const user: User = {
+          id: userData.id,
+          email: userData.email,
+          role: userData.role,
+          user_metadata: {
+            full_name: [userData.first_name, userData.last_name].filter(Boolean).join(' '),
+          },
+        };
+        
+        setUser(user);
+        setProfile(userData);
+        
+        // Cache the profile
+        localStorage.setItem('userProfile', JSON.stringify(userData));
+        localStorage.setItem('userRole', userData.role);
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        setUser(null);
+        setProfile(null);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userProfile');
+        localStorage.removeItem('userRole');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      
+      // Call our backend login endpoint
+      const formData = new URLSearchParams();
+      formData.append('username', email);
+      formData.append('password', password);
+      
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to sign in');
+      }
+
+      const { access_token } = await response.json();
+      
+      // Store the token
+      localStorage.setItem('authToken', access_token);
+      
+      // Fetch user profile
+      const userResponse = await fetch(`${API_URL}/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${access_token}`,
+        },
+      });
+      
+      if (!userResponse.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      
+      const userData = await userResponse.json();
+      
+      // Update state
+      const user: User = {
+        id: userData.id,
+        email: userData.email,
+        role: userData.role,
+        user_metadata: {
+          full_name: [userData.first_name, userData.last_name].filter(Boolean).join(' '),
+        },
+      };
+      
+      setUser(user);
+      setProfile(userData);
+      
+      // Cache the profile
+      localStorage.setItem('userProfile', JSON.stringify(userData));
+      localStorage.setItem('userRole', userData.role);
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Error signing in:', error);
+      return { 
+        error: error instanceof Error ? error : new Error('Failed to sign in')
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      setLoading(true);
+      
+      // Clear all auth data
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('userProfile');
+      localStorage.removeItem('userRole');
+      
+      // Update state
+      setUser(null);
+      setProfile(null);
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Error signing out:', error);
+      return { 
+        error: error instanceof Error ? error : new Error('Failed to sign out')
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const value = {
+    user,
+    profile,
+    loading,
+    signIn,
+    signOut,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+          app_metadata: {
+            provider: 'email'
+          },
+          role: profile.role
+        } as AppUser);
+      }
+      return profile;
+    } catch (error) {
+      console.error('[AuthContext] Error fetching profile:', error);
+      return null;
+    }
+  }, []);
+
+  // Handle initial auth check with better persistence
+  useEffect(() => {
+    let isMounted = true;
+
+    const getInitialSession = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('authToken');
+        
+        if (!token) {
+          if (isMounted) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            // Clear any cached data
+            localStorage.removeItem('userProfile');
+            localStorage.removeItem('userRole');
+          }
+          return;
+        }
+
+        // Verify token and get user data
+        const response = await fetch('http://localhost:8000/api/users/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Session expired or invalid');
+        }
+
+        const userProfile = await response.json();
+        
+        if (isMounted) {
+          const session = {
+            access_token: token,
+            user: {
+              id: userProfile.id,
+              email: userProfile.email,
+              user_metadata: {
+                full_name: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim(),
+              },
+            },
+          };
+          
+          setSession(session as any);
+          setUser({
+            id: userProfile.id,
+            email: userProfile.email,
+            role: userProfile.role,
+            user_metadata: {
+              full_name: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim(),
+            },
+            app_metadata: { provider: 'email' }
+          } as AppUser);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    getInitialSession();
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMounted) return;
+        
+        console.log('Auth: State change event:', event, !!session);
+        
+        // Don't process INITIAL_SESSION event if we're already initialized
+        if (event === 'INITIAL_SESSION' && initialized) {
+          console.log('Auth: Skipping initial session - already initialized');
+          return;
+        }
+        
+        setSession(session);
+        
+        if (session?.user) {
+          console.log('Auth: Session active, processing user...');
+          try {
+            // Check if user already exists in the users table
+            const { data: existingUser } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', session.user.id)
+              .single();
+
+            // Only create a new user with default role if they don't exist
+            if (!existingUser) {
+              console.log('Auth: Creating new user profile...');
+              await supabase
+                .from('users')
+                .upsert({
+                  id: session.user.id,
+                  email: session.user.email ?? '',
+                  role: 'FARMER',  // Default role for new users
+                  updated_at: new Date().toISOString(),
+                }, { onConflict: 'id' });
+            }
+          } catch (e) {
+            console.error('Auth: Error ensuring profile exists:', e);
+          }
+          
+          const profile = await fetchAndSetProfile(session.user.id);
+          if (profile) {
+            // Cache the profile for persistence
+            localStorage.setItem('userProfile', JSON.stringify(profile));
+            localStorage.setItem('userRole', profile.role);
+          }
+        } else {
+          console.log('Auth: No session, clearing state...');
+          setUser(null);
+          setProfile(null);
+          // Clear cached data on sign out
+          localStorage.removeItem('userProfile');
+          localStorage.removeItem('userRole');
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
+  }, [fetchAndSetProfile]);
+
+  // Clean up the AuthContext value to only include the necessary properties
+  const contextValue = useMemo(() => ({
+    session,
+    user,
+    profile,
+    loading,
+    signIn: async (email: string, password: string) => {
+      try {
+        setLoading(true);
+        
+        // Call our backend login endpoint
+        const formData = new URLSearchParams();
+        formData.append('grant_type', 'password');
+        formData.append('username', email);
+        formData.append('password', password);
+        
+        const response = await fetch('http://localhost:8000/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Failed to sign in');
+        }
+
+        const { access_token } = await response.json();
+        
+        // Store the token in localStorage
+        localStorage.setItem('authToken', access_token);
+        
+        // Set up the user session
+        const userResponse = await fetch('http://localhost:8000/api/users/me', {
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+          },
+        });
+        
+        if (!userResponse.ok) {
+          throw new Error('Failed to fetch user profile');
+        }
+        
+        const userProfile = await userResponse.json();
+        setProfile(userProfile);
+        
+        // Create a minimal session object for compatibility
+        const session = {
+          access_token,
+          user: {
+            id: userProfile.id,
+            email: userProfile.email,
+            user_metadata: {
+              full_name: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim(),
+            },
+          },
+        };
+        
+        setSession(session as any);
+        setUser(session.user as any);
+        
+        return { error: null };
+      } catch (error) {
+        console.error('Error signing in:', error);
+        return { 
+          error: error instanceof Error ? error : new Error('Failed to sign in')
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    signUp: async (email: string, password: string, userData: Partial<Profile>) => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              email,
+              role: userData.role || 'FARMER',
+              ...userData
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        // Create profile in the database
+        if (data.user) {
+          const { error: profileError } = await supabase
+            .from('users')
+            .upsert({
+              id: data.user.id,
+              email,
+              ...userData,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (profileError) throw profileError;
+        }
+
+        return { error: null };
+      } catch (error) {
+        console.error('Error signing up:', error);
+        return { 
+          error: error instanceof Error ? error : new Error('Failed to sign up')
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    signOut: async () => {
+      try {
+        setLoading(true);
+        
+        // Clear local state
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        
+        // Clear all stored data
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userProfile');
+        localStorage.removeItem('userRole');
+        
+        return { error: null };
+      } catch (error) {
+        console.error('Error signing out:', error);
+        return { 
+          error: error instanceof Error ? error : new Error('Failed to sign out')
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    updateProfile: async (updates: Partial<Profile>) => {
+      if (!user) return { error: new Error('Not authenticated') };
+      
+      try {
+        const { error } = await supabase
+          .from('users')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+          
+        if (error) throw error;
+        
+        // Refresh the profile data
+        await fetchUserProfile(user.id);
+        
+        return { error: null };
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        return { 
+          error: error instanceof Error ? error : new Error('Failed to update profile')
+        };
+      }
+    },
+    signInWithProvider: async (provider: 'google') => {
+      try {
+        setLoading(true);
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo: window.location.origin,
+          }
+        });
+        if (error) throw error;
+        // For OAuth, user will be redirected; return success for caller
+        return { error: null };
+      } catch (error) {
+        console.error('Error with OAuth sign-in:', error);
+        return { error: error instanceof Error ? error : new Error('Failed to sign in with provider') };
+      } finally {
+        setLoading(false);
+      }
+    },
+    resendVerification: async (email: string) => {
+      try {
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email,
+        });
+        if (error) throw error;
+        return { error: null };
+      } catch (error) {
+        console.error('Error resending verification:', error);
+        return { error: error instanceof Error ? error : new Error('Failed to resend verification email') };
+      }
+    }
+  }), [session, user, profile, loading]);
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}

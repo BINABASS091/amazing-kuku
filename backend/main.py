@@ -11,7 +11,11 @@ import aiohttp
 import asyncio
 from pydantic import BaseModel
 
-app = FastAPI(title="Crop Disease Prediction API")
+app = FastAPI(
+    title="Amazing Kuku - Poultry Disease Prediction API",
+    description="AI-powered poultry disease prediction service",
+    version="1.0.0"
+)
 
 # Enable CORS
 app.add_middleware(
@@ -113,7 +117,27 @@ async def root():
         "message": "Amazing Kuku - Poultry Disease Prediction API is running",
         "version": "1.0.0",
         "status": "healthy",
-        "external_api": "https://apipoultrydisease.onrender.com"
+        "external_api": "https://apipoultrydisease.onrender.com",
+        "endpoints": {
+            "health": "/health",
+            "predict": "/predict",
+            "docs": "/docs",
+            "openapi": "/openapi.json"
+        }
+    }
+
+@app.get("/api")
+async def api_info():
+    return {
+        "name": "Amazing Kuku API",
+        "version": "1.0.0",
+        "description": "Poultry disease prediction and management API",
+        "features": [
+            "Disease prediction from images",
+            "Multiple poultry breeds supported",
+            "Real-time health monitoring",
+            "External AI integration"
+        ]
     }
 
 @app.get("/health")
